@@ -1,0 +1,32 @@
+body {
+  font-family: Arial, sans-serif;
+  margin: 20px;
+  background: #f4f4f4;
+}
+
+h1 {
+  color: #333;
+  text-align: center;
+}
+
+.upload-section, .ocr-raw, .mapped-fields {
+  background: white;
+  padding: 15px;
+  margin: 15px 0;
+  border-radius: 8px;
+  box-shadow: 0 0 5px #ccc;
+}
+
+textarea {
+  width: 100%;
+  padding: 10px;
+}
+
+.field-row {
+  margin-bottom: 12px;
+}
+
+.field-row input {
+  width: 90%;
+  padding: 7px;
+}
