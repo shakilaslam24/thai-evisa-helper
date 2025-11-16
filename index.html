@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Thai E-Visa Helper (Free Version)</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Tesseract.js OCR -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+</head>
+<body>
+  <h1>Thai E-Visa Helper (Free Version)</h1>
+
+  <div class="upload-section">
+    <h2>1. Upload Your Documents</h2>
+
+    <label>Passport Image:
+      <input type="file" id="passportInput" accept="image/*,application/pdf">
+    </label><br><br>
+
+    <label>Air Ticket:
+      <input type="file" id="ticketInput" accept="image/*,application/pdf">
+    </label><br><br>
+
+    <label>Hotel Booking:
+      <input type="file" id="hotelInput" accept="image/*,application/pdf">
+    </label><br><br>
+
+    <button id="processBtn">Process Documents</button>
+  </div>
+
+  <hr>
+
+  <div class="result-container">
+
+    <div class="ocr-raw">
+      <h2>2. OCR Raw Text</h2>
+
+      <h3>Passport OCR:</h3>
+      <textarea id="passportOcr" rows="8"></textarea>
+
+      <h3>Ticket OCR:</h3>
+      <textarea id="ticketOcr" rows="6"></textarea>
+
+      <h3>Hotel OCR:</h3>
+      <textarea id="hotelOcr" rows="6"></textarea>
+    </div>
+
+    <div class="mapped-fields">
+      <h2>3. Thai E-Visa Field Mapping</h2>
+
+      <div class="field-row">
+        <label>Given Name:</label>
+        <input type="text" id="givenName">
+      </div>
+
+      <div class="field-row">
+        <label>Surname:</label>
+        <input type="text" id="surname">
+      </div>
+
+      <div class="field-row">
+        <label>Passport Number:</label>
+        <input type="text" id="passportNumber">
+      </div>
+
+      <div class="field-row">
+        <label>Date of Birth (DD-MM-YYYY):</label>
+        <input type="text" id="dob">
+      </div>
+
+      <div class="field-row">
+        <label>Passport Expiry:</label>
+        <input type="text" id="passportExpiry">
+      </div>
+
+    </div>
+
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
