@@ -30,10 +30,13 @@ credentials **once** to the console:
 ──────────────────────────────────────────────
 ```
 
-Set your own instead by exporting them before the first start:
+`ADMIN_EMAIL` / `ADMIN_PASSWORD` set those values, but **only when the very
+first admin is created**. To create an administrator or reset a password at any
+time — including when a password is lost — use:
 
 ```bash
-ADMIN_EMAIL=you@dreamfly.com ADMIN_PASSWORD='a-strong-password' npm start
+npm run admin -- --email you@dreamfly.com --password 'a-strong-password'
+npm run admin -- --list      # show which accounts exist
 ```
 
 ### Sample data (optional)
@@ -55,8 +58,8 @@ Copy `.env.example` and set the values, or export them in your process manager.
 | `PORT`           | HTTP port                                                       | `3000`         |
 | `NODE_ENV`       | Set to `production` to mark session cookies `Secure` (needs HTTPS) | `development` |
 | `DATA_DIR`       | Where the database and uploaded documents are stored             | `./data`       |
-| `ADMIN_EMAIL`    | Email of the first administrator (first run only)                | `admin@dreamfly.local` |
-| `ADMIN_PASSWORD` | Password of the first administrator (first run only)             | generated      |
+| `ADMIN_EMAIL`    | Email of the first administrator (first run only — otherwise use `npm run admin`) | `admin@dreamfly.local` |
+| `ADMIN_PASSWORD` | Password of the first administrator (first run only — otherwise use `npm run admin`) | generated      |
 | `ADMIN_NAME`     | Display name of the first administrator                          | `System Administrator` |
 
 Everything else — company details, invoice template, countries, service categories,

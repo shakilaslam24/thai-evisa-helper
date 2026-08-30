@@ -49,16 +49,24 @@ npm run seed -- --demo
 ──────────────────────────────────────────────
 ```
 
-নিজের পাসওয়ার্ড দিতে চাইলে:
+### ১.৩ক নিজের ইমেইল-পাসওয়ার্ড দিতে চাইলে
+
+**যেকোনো সময়** নিচের কমান্ড দিয়ে অ্যাডমিন অ্যাকাউন্ট তৈরি বা পাসওয়ার্ড বদল করা যায় —
+নিচের ইমেইল-পাসওয়ার্ডের জায়গায় **আপনার নিজেরটা** বসান:
 
 ```bash
-ADMIN_EMAIL=apnar@email.com ADMIN_PASSWORD='NijerPassword123' npm run seed -- --demo
+npm run admin -- --email apnar-email@gmail.com --password 'ApnarPassword123'
 ```
 
-Windows PowerShell-এ:
+> ⚠️ উপরের `apnar-email@gmail.com` শুধু **উদাহরণ** — হুবহু এটা লিখবেন না,
+> আপনার নিজের ইমেইল বসান।
 
-```powershell
-$env:ADMIN_EMAIL="apnar@email.com"; $env:ADMIN_PASSWORD="NijerPassword123"; npm run seed -- --demo
+**পাসওয়ার্ড ভুলে গেলে** একই কমান্ড দিয়ে যেকোনো অ্যাকাউন্টের পাসওয়ার্ড বদলানো যায়।
+
+কোন কোন অ্যাকাউন্ট আছে দেখতে:
+
+```bash
+npm run admin -- --list
 ```
 
 ### ১.৪ চালু করুন
@@ -336,7 +344,8 @@ Remove-Item -Recurse -Force data
 | --- | --- |
 | `node: command not found` | Node.js ইনস্টল হয়নি — পর্ব ১.১ দেখুন |
 | `Error: listen EADDRINUSE :::3000` | পোর্ট ব্যস্ত। `PORT=3001 npm start` দিয়ে চালান |
-| পাসওয়ার্ড হারিয়ে গেছে | `data` ফোল্ডার মুছে আবার `npm start` — নতুন পাসওয়ার্ড দেখাবে |
+| পাসওয়ার্ড হারিয়ে গেছে | `npm run admin -- --email <ইমেইল> --password 'notun-password'` |
+| "Incorrect email or password" | `npm run admin -- --list` দিয়ে দেখুন কোন ইমেইলগুলো আছে, তারপর উপরের কমান্ডে পাসওয়ার্ড বদলান |
 | পেজ সাদা দেখাচ্ছে | ব্রাউজারে `Ctrl + Shift + R` (hard refresh) |
 | আপলোড হচ্ছে না | ফাইল ১৫ MB-এর কম কিনা দেখুন; ছবি, PDF, Word, Excel সাপোর্ট করে |
 

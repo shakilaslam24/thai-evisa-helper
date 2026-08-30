@@ -52,7 +52,23 @@ function seedSettings() {
  */
 function seedAdmin() {
   const existing = db.prepare("SELECT COUNT(*) n FROM users WHERE role = 'admin'").get().n;
-  if (existing > 0) return null;
+  if (existing > 0) {
+    // ADMIN_EMAIL / ADMIN_PASSWORD only apply when creating the very first admin.
+    // Say so loudly — silently ignoring them leaves people unable to sign in.
+    if (process.env.ADMIN_EMAIL || process.env.ADMIN_PASSWORD) {
+      const current = db.prepare(
+        "SELECT email FROM users WHERE role = 'admin' AND active = 1 ORDER BY id LIMIT 1"
+      ).get();
+      console.log('\n──────────────────────────────────────────────');
+      console.log(' NOTE: ADMIN_EMAIL / ADMIN_PASSWORD were IGNORED.');
+      console.log(' An administrator already exists, so no new one was created.');
+      if (current) console.log(`   Existing admin: ${current.email}`);
+      console.log('\n To create that account or reset a password, run:');
+      console.log("   npm run admin -- --email you@company.com --password 'your-password'");
+      console.log('──────────────────────────────────────────────\n');
+    }
+    return null;
+  }
 
   const email = (process.env.ADMIN_EMAIL || 'admin@dreamfly.local').toLowerCase();
   const generated = !process.env.ADMIN_PASSWORD;
