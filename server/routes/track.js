@@ -126,6 +126,7 @@ router.get('/settings', wrap((req, res) => {
       enabled: isEnabled(),
       company_name: company.company_name || 'DreamFly Consultancy',
       company_tagline: company.company_tagline || '',
+      company_logo_url: company.company_logo_url || '',
       company_phone: company.company_phone || '',
       company_email: company.company_email || '',
     },

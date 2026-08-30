@@ -210,15 +210,30 @@ export async function invoiceDetailView({ id }) {
 
   const sheet = el('div', { class: 'invoice-sheet' }, [
     el('div', { class: 'invoice-sheet__head' }, [
-      el('div', {}, [
-        el('div', { class: 'invoice-sheet__title', text: company.company_name || 'DreamFly Consultancy' }),
-        el('div', { class: 'muted small' }, [
-          company.company_tagline || '', el('br'),
-          company.company_address || '', el('br'),
-          [company.company_phone, company.company_phone_alt].filter(Boolean).join(' · '), el('br'),
-          [company.company_email, company.company_website].filter(Boolean).join(' · '),
-        ]),
-      ]),
+      (() => {
+        // The lockup already carries the company name, so printing it again as
+        // a heading just repeats itself. Only fall back to text if no logo shows.
+        const logo = el('img', {
+          class: 'invoice-sheet__logo',
+          src: company.company_logo_url || '/assets/brand/logo-wide-dark.png',
+          alt: company.company_name || 'DreamFly Consultancy',
+        });
+        const name = el('div', {
+          class: 'invoice-sheet__title', hidden: true,
+          text: company.company_name || 'DreamFly Consultancy',
+        });
+        logo.addEventListener('error', () => { logo.hidden = true; name.hidden = false; });
+        return el('div', {}, [
+          logo,
+          name,
+          el('div', { class: 'muted small' }, [
+            company.company_tagline || '', el('br'),
+            company.company_address || '', el('br'),
+            [company.company_phone, company.company_phone_alt].filter(Boolean).join(' · '), el('br'),
+            [company.company_email, company.company_website].filter(Boolean).join(' · '),
+          ]),
+        ]);
+      })(),
       el('div', { style: 'text-align:right' }, [
         el('div', { style: 'font-size:22px;font-weight:750;letter-spacing:.08em', text: 'INVOICE' }),
         el('div', { class: 'mono', style: 'font-size:15px;margin-top:4px', text: inv.invoice_no }),

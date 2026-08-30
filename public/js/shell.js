@@ -28,18 +28,33 @@ const NAV = [
 let refs = {};
 let searchTimer = null;
 
+/**
+ * The sidebar sits on brand navy, so the white lockup is used. A logo set in
+ * Settings replaces it, which keeps the system usable by another company.
+ */
+function brandLockup() {
+  const custom = store.settings.company_logo_url;
+  if (custom) {
+    return [
+      el('div', { class: 'sidebar__logo' }, el('img', { src: custom, alt: '' })),
+      el('div', {}, [
+        el('div', { class: 'sidebar__name', text: store.settings.company_name || 'DreamFly' }),
+        el('div', { class: 'sidebar__tag', text: 'Consultancy CRM' }),
+      ]),
+    ];
+  }
+  return [el('img', {
+    class: 'sidebar__lockup', src: '/assets/brand/logo-wide-light.png',
+    alt: store.settings.company_name || 'DreamFly Consultancy',
+  })];
+}
+
 export function buildShell() {
   const outlet = el('main', { class: 'content', id: 'outlet' });
 
   const nav = el('nav', { class: 'sidebar__nav' });
   const sidebar = el('aside', { class: 'sidebar', id: 'sidebar' }, [
-    el('div', { class: 'sidebar__brand' }, [
-      el('div', { class: 'sidebar__logo', text: 'DF' }),
-      el('div', {}, [
-        el('div', { class: 'sidebar__name', text: store.settings.company_name || 'DreamFly' }),
-        el('div', { class: 'sidebar__tag', text: 'Consultancy CRM' }),
-      ]),
-    ]),
+    el('div', { class: 'sidebar__brand' }, brandLockup()),
     nav,
     el('div', { class: 'sidebar__foot', text: `Signed in as ${store.user.role}` }),
   ]);

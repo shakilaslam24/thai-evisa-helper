@@ -35,12 +35,12 @@ export function renderLogin(root, onSuccess) {
   });
 
   root.replaceChildren(el('div', { class: 'login-page' }, el('div', { class: 'login-card' }, [
-    el('div', { class: 'login-card__brand' }, [
-      el('div', { class: 'sidebar__logo', text: 'DF' }),
-      el('div', {}, [
-        el('h1', { text: 'DreamFly Consultancy' }),
-        el('div', { class: 'muted small', text: 'CRM & Operations Management' }),
-      ]),
+    el('div', { style: 'text-align:center;margin-bottom:22px' }, [
+      el('img', {
+        class: 'login-card__logo', src: '/assets/brand/logo-wide-dark.png',
+        alt: 'DreamFly Consultancy',
+      }),
+      el('div', { class: 'muted small', text: 'CRM & Operations Management' }),
     ]),
     form,
     el('p', { class: 'faint small mt-2', text: 'Contact your administrator if you need an account or a password reset.' }),

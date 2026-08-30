@@ -8,10 +8,18 @@ async function loadBranding() {
   try {
     const res = await api.get('/api/track/settings');
     const s = res.data;
-    document.getElementById('companyName').textContent = s.company_name;
     document.title = `Track Your Application — ${s.company_name}`;
-    document.getElementById('logo').textContent =
-      s.company_name.split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+    // The DreamFly lockup is the default; a logo set in Settings replaces it,
+    // and the company name shows as text when no image is available.
+    const logo = document.getElementById('logo');
+    const heading = document.getElementById('companyName');
+    if (s.company_logo_url) logo.src = s.company_logo_url;
+    logo.alt = s.company_name;
+    logo.addEventListener('error', () => {
+      logo.hidden = true;
+      heading.hidden = false;
+      heading.textContent = s.company_name;
+    });
     if (s.company_tagline) document.getElementById('companyTag').textContent = s.company_tagline;
 
     const contact = document.getElementById('contact');
