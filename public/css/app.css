@@ -491,15 +491,11 @@ fieldset.section > legend {
 .invoice-sheet tr { page-break-inside:avoid; break-inside:avoid; }
 
 /* Who raised the invoice, and room for a signature. */
-.invoice-signoff { display:flex; justify-content:space-between; gap:28px; flex-wrap:wrap;
-  margin-top:26px; padding-top:16px; border-top:1px solid var(--border);
+.invoice-signoff { margin-top:26px; padding-top:16px; border-top:1px solid var(--border);
   page-break-inside:avoid; break-inside:avoid; }
-.invoice-signoff > * { min-width:0; flex:1 1 200px; }
-.invoice-signoff__right { text-align:right; }
 .invoice-signoff__name { font-weight:650; margin-top:3px; }
-.invoice-signoff__for { font-weight:600; font-size:13px; }
-.invoice-signoff__rule { border-bottom:1px solid var(--border-strong); height:38px;
-  margin:2px 0 5px auto; max-width:220px; }
+.invoice-signoff__note { margin-top:14px; font-size:12px; font-style:italic;
+  color:var(--text-faint); }
 .invoice-totals { margin-left:auto; margin-top:16px; width:min(320px,100%); }
 .invoice-totals__row { display:flex; justify-content:space-between; padding:6px 0; font-size:13.5px; }
 .invoice-totals__row--grand { border-top:2px solid var(--border-strong); margin-top:6px;

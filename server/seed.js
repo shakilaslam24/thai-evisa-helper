@@ -20,6 +20,7 @@ const DEFAULT_SETTINGS = {
   invoice_currency: 'BDT',
   invoice_footer: 'Thank you for choosing DreamFly Consultancy.',
   invoice_terms: 'Payment is due within 7 days of the invoice date.',
+  invoice_generated_note: 'This is a computer-generated invoice and does not require a signature.',
   notify_followup_due: '1',
   notify_meeting_reminder: '1',
   notify_payment_due: '1',

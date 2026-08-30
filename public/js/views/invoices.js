@@ -371,19 +371,14 @@ export async function invoiceDetailView({ id }) {
       company.invoice_terms || '', el('br'), company.invoice_footer || '',
     ]),
 
+    // No signature block: the invoice comes out of the system, so it states who
+    // raised it and says plainly that it needs no signature.
     el('div', { class: 'invoice-signoff' }, [
-      el('div', {}, [
-        el('div', { class: 'kv__label', text: 'Prepared by' }),
-        el('div', { class: 'invoice-signoff__name', text: inv.created_by_name || '—' }),
-        el('div', { class: 'faint small', text: fmtDate(inv.created_at) }),
-      ]),
-      el('div', { class: 'invoice-signoff__right' }, [
-        // Company first, then room to sign, then the caption — the order a
-        // signature block is normally read and signed in.
-        el('div', { class: 'invoice-signoff__for', text: `For ${company.company_name || 'DreamFly Consultancy'}` }),
-        el('div', { class: 'invoice-signoff__rule' }),
-        el('div', { class: 'kv__label', text: 'Authorised signature' }),
-      ]),
+      el('div', { class: 'kv__label', text: 'Prepared by' }),
+      el('div', { class: 'invoice-signoff__name', text: inv.created_by_name || '—' }),
+      el('div', { class: 'faint small', text: fmtDate(inv.created_at) }),
+      el('div', { class: 'invoice-signoff__note', text: company.invoice_generated_note
+        || 'This is a computer-generated invoice and does not require a signature.' }),
     ]),
   ]);
 

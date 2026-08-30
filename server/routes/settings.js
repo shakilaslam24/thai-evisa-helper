@@ -13,6 +13,7 @@ const COMPANY_KEYS = [
   'company_name', 'company_tagline', 'company_address', 'company_phone',
   'company_phone_alt', 'company_email', 'company_website', 'company_logo_url',
   'invoice_prefix', 'invoice_currency', 'invoice_footer', 'invoice_terms',
+  'invoice_generated_note',
   'file_prefix', 'public_tracking',
   'notify_followup_due', 'notify_meeting_reminder', 'notify_payment_due',
   'notify_interview_reminder', 'notify_missing_documents',

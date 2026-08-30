@@ -83,6 +83,9 @@ async function invoicePanel() {
     { name: 'invoice_currency', label: 'Default currency', value: s.invoice_currency },
     { name: 'invoice_terms', label: 'Payment terms', type: 'textarea', span: true, value: s.invoice_terms },
     { name: 'invoice_footer', label: 'Invoice footer note', type: 'textarea', span: true, value: s.invoice_footer },
+    { name: 'invoice_generated_note', label: 'Computer-generated note', type: 'textarea', span: true,
+      value: s.invoice_generated_note,
+      hint: 'Printed under the staff name, in place of a signature line' },
   ], {
     title: 'Invoice & reference numbering',
     description: 'Numbering and the wording shown on every invoice you print or export.',
