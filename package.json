@@ -10,7 +10,11 @@
     "dev": "node --watch server/index.js",
     "seed": "node server/seed.js",
     "reset": "node server/seed.js --reset",
-    "admin": "node server/admin.js"
+    "admin": "node server/admin.js",
+    "backup": "node server/backup.js",
+    "restore": "node server/backup.js --restore",
+    "doctor": "node server/doctor.js",
+    "update": "bash scripts/update.sh"
   },
   "engines": {
     "node": ">=18"

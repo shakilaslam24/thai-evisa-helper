@@ -137,21 +137,32 @@ Then put Nginx (or Caddy) in front to terminate TLS and proxy to port 3000.
 **Run behind HTTPS in production** — session cookies are only marked `Secure`
 when `NODE_ENV=production`, and passwords should never travel in the clear.
 
+### Running it day to day
+
+| Task | Command |
+| --- | --- |
+| Health check | `npm run doctor` |
+| Back up now | `npm run backup` |
+| List backups | `npm run backup -- --list` |
+| Roll back | `npm run restore -- --latest` |
+| Update to the latest version | `npm run update` |
+| Create an admin / reset a password | `npm run admin -- --email … --password '…'` |
+
+`docs/OPERATIONS.md` covers all of this in detail (in Bengali), including the
+cron entry for nightly backups and what to do when something breaks.
+
 ### Backups
 
-Everything lives under `DATA_DIR`:
+Everything lives under `DATA_DIR` — `dreamfly.db` and `uploads/`. `npm run backup`
+copies the database through SQLite's backup API (safe while the server is
+running) and mirrors new uploads, keeping the last 14 sets. Schedule it nightly:
 
 ```
-data/
-  dreamfly.db        # the whole database
-  uploads/           # every uploaded document
+0 3 * * * cd /opt/dreamfly-crm && /usr/bin/npm run backup >> /var/log/dreamfly-backup.log 2>&1
 ```
 
-Back up that directory. A safe hot copy of the database:
-
-```bash
-sqlite3 data/dreamfly.db ".backup '/backups/dreamfly-$(date +%F).db'"
-```
+Keep a copy off the server as well — a backup on the same disk does not survive
+losing that disk.
 
 ---
 
