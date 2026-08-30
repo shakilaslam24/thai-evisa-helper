@@ -2,10 +2,14 @@
 /**
  * Public application tracking — no login.
  *
- * A client enters their passport number and date of birth and sees where their
- * application stands. Two facts are required rather than one, so knowing a
- * passport number alone is not enough to read someone else's case, and attempts
- * are rate limited so the pair cannot be guessed by brute force.
+ * A client enters their passport number and their name and sees where their
+ * application stands. Two facts are required rather than one, so a passport
+ * number on its own opens nothing, and attempts are rate limited so the pair
+ * cannot be guessed by brute force.
+ *
+ * Name rather than date of birth is the second factor because a date of birth
+ * is often not captured when a client hands over their details, which would
+ * leave those clients unable to track anything at all.
  *
  * The response is deliberately narrow: status and dates yes, but never phone
  * numbers, addresses, notes, invoice amounts or internal remarks.
@@ -43,6 +47,42 @@ setInterval(() => {
 }, WINDOW_MS).unref();
 
 const isEnabled = () => vocab.setting('public_tracking', '1') !== '0';
+
+/** Ignore case, punctuation and spacing so ordinary typing still matches. */
+const normalise = (value) => String(value || '')
+  .toLowerCase()
+  .replace(/[^a-z0-9\u0980-\u09FF ]+/g, ' ')
+  .replace(/\s+/g, ' ')
+  .trim();
+
+/**
+ * Accepts the full name, just the given name, or just the surname, in any word
+ * order — passports and everyday use disagree about which name comes first.
+ *
+ * The comparison runs both ways: every word typed appears in the stored name,
+ * or every stored word appears in what was typed. The second direction matters
+ * here, where a record saved as "Mahmudul Karim" is routinely written out as
+ * "Md. Mahmudul Karim". Either way the client has to know the real name, so a
+ * single common word still opens nothing.
+ */
+function nameMatches(entered, customer) {
+  const typed = normalise(entered);
+  if (typed.length < 3) return false;
+
+  const given = normalise(customer.given_name);
+  const surname = normalise(customer.surname);
+  const full = normalise(`${customer.given_name} ${customer.surname || ''}`);
+  if (typed === full || (given && typed === given) || (surname && typed === surname)) return true;
+
+  const storedWords = full.split(' ').filter(Boolean);
+  const typedWords = typed.split(' ').filter(Boolean);
+  if (!storedWords.length || !typedWords.length) return false;
+
+  const stored = new Set(storedWords);
+  const supplied = new Set(typedWords);
+  return typedWords.every((w) => stored.has(w))
+    || storedWords.every((w) => supplied.has(w));
+}
 
 /** How far along the application is, for a simple progress bar. */
 const STAGE_ORDER = [
@@ -97,17 +137,19 @@ router.post('/', wrap((req, res) => {
   rateLimit(req);
 
   const passport = String(req.body.passport_no || '').trim();
-  const dob = String(req.body.dob || '').trim();
-  if (!passport || !dob) bad('Please enter both your passport number and date of birth.');
+  const name = String(req.body.name || '').trim();
+  if (!passport || !name) bad('Please enter both your passport number and your name.');
+  if (normalise(name).length < 3) bad('Please enter your name as written in your passport.');
 
-  const customer = db.prepare(
-    'SELECT id, given_name, surname FROM customers WHERE upper(passport_no) = upper(?) AND dob = ?'
-  ).get(passport, dob);
+  const candidates = db.prepare(
+    'SELECT id, given_name, surname FROM customers WHERE upper(passport_no) = upper(?)'
+  ).all(passport);
+  const customer = candidates.find((c) => nameMatches(name, c));
 
-  // One message for "no such passport" and "wrong date", so the form cannot be
+  // One message for "no such passport" and "wrong name", so the form cannot be
   // used to discover which passport numbers exist in the system.
   const notFound = () => res.status(404).json({
-    error: 'No application found for those details. Please check the passport number and date of birth, or contact our office.',
+    error: 'No application found for those details. Please check the passport number and name, or contact our office.',
   });
   if (!customer) return notFound();
 

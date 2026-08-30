@@ -195,7 +195,7 @@ export async function fileDetailView({ id }) {
           const url = `${window.location.origin}/track.html`;
           try {
             await navigator.clipboard.writeText(url);
-            toast('Tracking link copied — the client needs their passport number and date of birth');
+            toast('Tracking link copied — the client needs their passport number and name');
           } catch {
             e.target.textContent = url;
             toast('Copy this link manually');
@@ -206,7 +206,6 @@ export async function fileDetailView({ id }) {
     ].filter(Boolean)),
   ]);
 
-  const trackingBlocked = !f.customer_dob;
   const details = card('File details', kv([
     ['Customer', f.customer_id ? el('a', { href: `#/customers/${f.customer_id}`, text: f.customer_name }) : null],
     ['Passport number', f.passport_no],
@@ -222,10 +221,6 @@ export async function fileDetailView({ id }) {
     ['B2B partner', f.partner_id ? el('a', { href: `#/partners/${f.partner_id}`, text: f.partner_name }) : 'Direct client'],
     ['Created', `${fmtDateTime(f.created_at)}${f.created_by_name ? ` by ${f.created_by_name}` : ''}`],
     ['Remarks', f.remarks],
-    trackingBlocked
-      ? ['Online tracking', el('span', { class: 'badge badge--warn',
-          text: 'Add the date of birth so the client can track online' })]
-      : null,
   ]));
 
   const checklistCard = card('Document checklist', checklist(f.id, res.checklist, editable, refresh), {

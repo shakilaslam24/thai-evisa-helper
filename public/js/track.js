@@ -34,15 +34,17 @@ function renderForm(message) {
     name: 'passport_no', required: true, autocomplete: 'off', autocapitalize: 'characters',
     placeholder: 'e.g. BX0154892',
   });
-  const dob = el('input', { name: 'dob', type: 'date', required: true });
+  const name = el('input', {
+    name: 'name', required: true, autocomplete: 'name', placeholder: 'e.g. Mahmudul Karim',
+  });
   const submit = el('button', { class: 'btn btn--primary btn--block', type: 'submit', text: 'Check status' });
 
   const form = el('form', { class: 'stack' }, [
     error,
     el('div', { class: 'field' }, [el('label', { text: 'Passport number' }), passport]),
     el('div', { class: 'field' }, [
-      el('label', { text: 'Date of birth' }), dob,
-      el('div', { class: 'field__hint', text: 'Exactly as written in your passport' }),
+      el('label', { text: 'Your name' }), name,
+      el('div', { class: 'field__hint', text: 'Full name, or just your surname' }),
     ]),
     submit,
   ]);
@@ -55,7 +57,7 @@ function renderForm(message) {
     try {
       const res = await api.post('/api/track', {
         passport_no: passport.value.trim(),
-        dob: dob.value,
+        name: name.value.trim(),
       });
       renderResult(res.data);
     } catch (err) {
@@ -69,7 +71,7 @@ function renderForm(message) {
   clear(root).append(el('div', { class: 'track-card' }, [
     el('h2', { class: 'mt-0', text: 'Find your application' }),
     el('p', { class: 'muted small', style: 'margin:6px 0 18px',
-      text: 'Enter your passport number and date of birth exactly as they appear in your passport.' }),
+      text: 'Enter your passport number and your name as written in your passport.' }),
     form,
   ]));
   passport.focus();
