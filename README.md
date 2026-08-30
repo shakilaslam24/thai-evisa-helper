@@ -183,6 +183,13 @@ docs/USER_GUIDE.md
 - Role checks are enforced on the server for every write, not only hidden in the UI.
 - The last active administrator cannot be demoted or deactivated.
 
+## Testing
+
+A step-by-step run-and-test guide, written in Bengali, is in
+[`docs/TESTING-CHECKLIST.md`](docs/TESTING-CHECKLIST.md) — it walks through
+starting the system and ticking off every module against the requirement
+document.
+
 ## Passport OCR helper
 
 The original Thai e-Visa OCR tool is preserved at `/tools/evisa/` — open
