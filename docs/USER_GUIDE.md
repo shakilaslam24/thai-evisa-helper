@@ -293,13 +293,19 @@ records that already use it.
 
 ### Roles
 
-| Role | Can do |
-| --- | --- |
-| **Admin** | Everything, including users and settings |
-| **Manager** | Leads, customers, partners, files, follow-up, meetings, documents, invoices, payments, reports |
-| **Staff / Executive** | Leads, follow-up, meetings, customers, files, documents, notes |
-| **Accounts / Finance** | Invoices, payments, dues and financial reports |
-| **B2B Partner** | Only the files and invoices under their own partner account |
+Everyone on the team can do the same day-to-day work — take a lead, add a customer,
+open a file, raise an invoice, collect a payment. What changes with the role is how
+much of the company a person can see, and who is allowed to delete something.
+
+| Role | Sees | May delete |
+| --- | --- | --- |
+| **Admin** | The whole company, plus users and settings | Files, documents, customers |
+| **Manager** | The whole company — pipeline and money | No |
+| **Accounts / Finance** | The whole company's money; own work in the pipeline | No |
+| **Staff / Executive** | Only their own work and their own sales | No |
+| **B2B Partner** | Only the files and invoices under their own partner account (read-only) | No |
+
+Staff performance and the Partner-wise report are shown to admins and managers only.
 
 The last active administrator cannot be demoted or deactivated, so you can never
 lock yourself out.

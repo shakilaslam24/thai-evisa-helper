@@ -56,17 +56,27 @@ const DEFAULT_CHECKLIST_ITEMS = [
   'Passport Copy', 'Photo', 'NID', 'Bank Statement', 'Air Ticket', 'Hotel Booking',
 ];
 
-// Which roles may write to which module. Admin is implicitly allowed everywhere.
+/**
+ * Who may write to which module. Admin is implicitly allowed everywhere.
+ *
+ * Everyone on the team does the day-to-day work: taking a lead, adding a
+ * customer, opening a file, raising an invoice, collecting a payment. Roles
+ * differ in two other ways instead — how much of the company they can *see*
+ * (see seesAllWork / seesAllMoney in auth.js) and who may delete a record.
+ * A B2B partner login writes nothing.
+ */
+const OPERATIONAL = ['admin', 'manager', 'staff', 'accounts'];
+
 const WRITE_ACCESS = {
-  leads:     ['admin', 'manager', 'staff'],
-  followups: ['admin', 'manager', 'staff'],
-  meetings:  ['admin', 'manager', 'staff'],
-  customers: ['admin', 'manager', 'staff'],
-  files:     ['admin', 'manager', 'staff'],
-  partners:  ['admin', 'manager', 'staff'],
-  documents: ['admin', 'manager', 'staff'],
-  invoices:  ['admin', 'manager', 'accounts'],
-  payments:  ['admin', 'manager', 'accounts'],
+  leads:     OPERATIONAL,
+  followups: OPERATIONAL,
+  meetings:  OPERATIONAL,
+  customers: OPERATIONAL,
+  files:     OPERATIONAL,
+  partners:  OPERATIONAL,
+  documents: OPERATIONAL,
+  invoices:  OPERATIONAL,
+  payments:  OPERATIONAL,
   settings:  ['admin'],
   users:     ['admin'],
 };

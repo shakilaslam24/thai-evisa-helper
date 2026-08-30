@@ -90,13 +90,22 @@ inside the app under **Settings**.
 
 ## User roles
 
-| Role | Access |
-| --- | --- |
-| **Admin** | Everything, including users and settings. Only an admin can delete a case file, an uploaded document or a customer. |
-| **Manager** | Leads, customers, partners, files, follow-up, meetings, documents, invoices, payments and reports. |
-| **Staff / Executive** | Leads, follow-up, meetings, customers, files, documents and notes. Their dashboard, invoices, payments and reports show only their own work and their own sales — the company's figures are limited to admins and managers. |
-| **Accounts / Finance** | Invoices, payments, due reports and financial summaries. Sees the company's money everywhere, since producing financial summaries is the role's job, but not the company-wide sales pipeline. |
-| **B2B Partner** | Limited login that only ever sees the files and invoices under its own partner account. |
+Everyone on the team does the same day-to-day work — leads, follow-up, meetings,
+customers, files, documents, invoices and payments. A walk-in client pays whoever
+is at the desk, so any team member can raise a bill and take the money against it.
+Roles differ in two other things instead: **how much of the company a person sees**,
+and **who may delete a record**.
+
+| Role | Day-to-day work | Sees | May delete |
+| --- | --- | --- | --- |
+| **Admin** | Everything, plus users and settings | The whole company | Files, documents, customers |
+| **Manager** | All of it | The whole company — pipeline and money | No |
+| **Accounts / Finance** | All of it | The whole company's money; own work in the sales pipeline | No |
+| **Staff / Executive** | All of it, invoices and payments included | Only their own work and their own sales | No |
+| **B2B Partner** | Nothing — read-only login | Only the files and invoices under their own partner account | No |
+
+Two reports — **Staff performance** and **Partner-wise** — are limited to admins and
+managers, and are not offered to anyone else.
 
 ---
 

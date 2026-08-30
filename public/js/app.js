@@ -21,6 +21,31 @@ import settingsView from './views/settings.js';
 
 const root = document.getElementById('root');
 
+/**
+ * Hiding a menu item is not the same as closing the page: the address bar still
+ * reaches it, and the view then fails with a raw error from the server. Roles
+ * that cannot use a page get a plain explanation instead. The server refuses
+ * the data either way — this is only about what the screen says.
+ */
+const ROUTE_ROLES = {
+  staff: ['admin', 'manager'],
+  settings: ['admin'],
+};
+
+function guard(name, view) {
+  const allowed = ROUTE_ROLES[name];
+  return (r) => {
+    if (allowed && !allowed.includes(store.user?.role)) {
+      return el('div', { class: 'card' }, el('div', { class: 'card__body' }, [
+        el('h2', { class: 'mt-0', text: 'Not available for your role' }),
+        el('p', { class: 'muted', text: 'This page is limited to other members of the team. Everything you need for your own work is in the menu.' }),
+        el('a', { class: 'btn btn--primary mt-1', href: '#/dashboard', text: 'Back to dashboard' }),
+      ]));
+    }
+    return view(r);
+  };
+}
+
 function registerRoutes() {
   route('dashboard', dashboardView);
   route('leads', (r) => (r.id ? leadDetailView(r) : leadsView(r)));
@@ -33,9 +58,9 @@ function registerRoutes() {
   route('invoices', (r) => (r.id ? invoiceDetailView(r) : invoicesView(r)));
   route('payments', paymentsView);
   route('reports', reportsView);
-  route('staff', staffView);
+  route('staff', guard('staff', staffView));
   route('notifications', notificationsView);
-  route('settings', settingsView);
+  route('settings', guard('settings', settingsView));
   setNotFound(() => el('div', { class: 'card' }, el('div', { class: 'card__body' }, [
     el('h2', { text: 'Page not found' }),
     el('p', { class: 'muted', text: 'That page does not exist. Use the menu to continue.' }),

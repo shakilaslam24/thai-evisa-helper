@@ -213,10 +213,11 @@ async function usersPanel() {
   return el('div', { class: 'stack' }, [
     host,
     card('What each role can do', el('div', { class: 'stack small' }, [
-      roleRow('Admin', 'Full access to everything, including users and settings.'),
-      roleRow('Manager', 'Leads, customers, B2B partners, files, follow-up, invoices and reports.'),
-      roleRow('Staff / Executive', 'Add leads, update follow-up, create customer profiles, update file status and add notes.'),
-      roleRow('Accounts / Finance', 'Invoices, payments, due reports and financial summaries.'),
+      el('p', { class: 'muted mt-0', text: 'Everyone on the team does the same day-to-day work — leads, follow-up, meetings, customers, files, documents, invoices and payments. Roles differ in how much of the company they can see, and who may delete a record.' }),
+      roleRow('Admin', 'Everything, plus users and settings. The only role that can delete a file, a document or a customer.'),
+      roleRow('Manager', 'All day-to-day work, and sees the whole company — pipeline and money.'),
+      roleRow('Accounts / Finance', 'All day-to-day work, and sees the whole company’s money. Own work only in the sales pipeline.'),
+      roleRow('Staff / Executive', 'All day-to-day work, including raising invoices and collecting payments. Sees only their own work and their own sales.'),
       roleRow('B2B Partner', 'Limited login — sees only the files and invoices under their own partner account.'),
     ])),
   ]);

@@ -143,15 +143,10 @@ router.get('/:id', wrap((req, res) => {
   const invoice = db.prepare(`${SELECT} WHERE i.id = ?`).get(Number(req.params.id));
   if (!invoice) notFound('Invoice not found');
   guardPartnerScope(req, invoice);
-  if (!seesAllMoney(req.user)) {
-    const ownsIt = invoice.created_by === req.user.id
-      || db.prepare(`SELECT 1 FROM invoices i
-           LEFT JOIN customers c ON c.id = i.customer_id
-           LEFT JOIN case_files f ON f.id = i.case_file_id
-           WHERE i.id = ? AND (c.assigned_to = ? OR f.assigned_to = ?)`)
-        .get(invoice.id, req.user.id, req.user.id);
-    if (!ownsIt) throw new HttpError(403, 'You can only open invoices for your own customers and files');
-  }
+  // Opening one invoice is deliberately not restricted for the team: a walk-in
+  // client pays whoever is at the desk, and that person has to be able to find
+  // the bill. What stays scoped is the listing and its totals — how much each
+  // person sold — not the ability to serve a colleague's client.
   const items = db.prepare('SELECT * FROM invoice_items WHERE invoice_id = ? ORDER BY id').all(invoice.id);
   const payments = db.prepare(`
     SELECT pay.*, u.name AS received_by_name FROM payments pay

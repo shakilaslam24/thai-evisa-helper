@@ -50,16 +50,18 @@ export const staffUsers = () => store.users.filter((u) => u.active && u.role !==
 export const listValues = (type) => (store.lookups[type] || []).map((x) => x.value);
 
 /** Module-level write permission, mirroring the server's matrix. */
+const OPERATIONAL = ['admin', 'manager', 'staff', 'accounts'];
+
 const WRITE_ACCESS = {
-  leads: ['admin', 'manager', 'staff'],
-  followups: ['admin', 'manager', 'staff'],
-  meetings: ['admin', 'manager', 'staff'],
-  customers: ['admin', 'manager', 'staff'],
-  files: ['admin', 'manager', 'staff'],
-  partners: ['admin', 'manager', 'staff'],
-  documents: ['admin', 'manager', 'staff'],
-  invoices: ['admin', 'manager', 'accounts'],
-  payments: ['admin', 'manager', 'accounts'],
+  leads: OPERATIONAL,
+  followups: OPERATIONAL,
+  meetings: OPERATIONAL,
+  customers: OPERATIONAL,
+  files: OPERATIONAL,
+  partners: OPERATIONAL,
+  documents: OPERATIONAL,
+  invoices: OPERATIONAL,
+  payments: OPERATIONAL,
   settings: ['admin'],
   users: ['admin'],
 };
