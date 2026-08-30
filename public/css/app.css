@@ -461,18 +461,45 @@ fieldset.section > legend {
 
 /* invoice sheet */
 .invoice-sheet { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg);
-  padding:32px; box-shadow:var(--shadow-sm); max-width:860px; }
+  padding:32px; box-shadow:var(--shadow-sm); max-width:860px; overflow:hidden; }
+/* Long addresses and unbroken words must wrap rather than push the layout wider. */
+.invoice-sheet, .invoice-sheet * { overflow-wrap:anywhere; word-break:normal; }
 .invoice-sheet__head { display:flex; justify-content:space-between; gap:20px; flex-wrap:wrap;
   padding-bottom:20px; border-bottom:2px solid var(--brand-600); }
+/* min-width:0 lets a flex child shrink; without it a long email forces a wrap
+   and drops the INVOICE block below the company details. */
+.invoice-sheet__head > * { min-width:0; }
+.invoice-sheet__from { flex:1 1 320px; }
+.invoice-sheet__meta { flex:0 1 auto; text-align:right; }
 .invoice-sheet__title { font-size:26px; font-weight:750; letter-spacing:-.02em; color:var(--brand-900); }
 .invoice-sheet__logo { width:100%; max-width:250px; height:auto; margin-bottom:10px; display:block; }
 .invoice-sheet__parties { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
   gap:22px; margin:22px 0; }
-.invoice-sheet table { width:100%; border-collapse:collapse; margin-top:10px; }
+.invoice-sheet__parties > * { min-width:0; }
+/* Fixed layout keeps the money columns on the page no matter how long a
+   description runs — otherwise the widest cell decides and the rest fall off. */
+.invoice-sheet table { width:100%; border-collapse:collapse; margin-top:10px; table-layout:fixed; }
+.invoice-sheet col.c-num { width:34px; }
+.invoice-sheet col.c-qty { width:62px; }
+.invoice-sheet col.c-price { width:110px; }
+.invoice-sheet col.c-amount { width:118px; }
 .invoice-sheet th { text-align:left; padding:9px 10px; background:var(--surface-2);
   border-bottom:1px solid var(--border-strong); font-size:11.5px; text-transform:uppercase;
   letter-spacing:.04em; color:var(--text-soft); }
-.invoice-sheet td { padding:10px; border-bottom:1px solid var(--border); }
+.invoice-sheet td { padding:10px; border-bottom:1px solid var(--border); vertical-align:top; }
+.invoice-sheet td.num, .invoice-sheet th.num { text-align:right; white-space:nowrap; }
+.invoice-sheet tr { page-break-inside:avoid; break-inside:avoid; }
+
+/* Who raised the invoice, and room for a signature. */
+.invoice-signoff { display:flex; justify-content:space-between; gap:28px; flex-wrap:wrap;
+  margin-top:26px; padding-top:16px; border-top:1px solid var(--border);
+  page-break-inside:avoid; break-inside:avoid; }
+.invoice-signoff > * { min-width:0; flex:1 1 200px; }
+.invoice-signoff__right { text-align:right; }
+.invoice-signoff__name { font-weight:650; margin-top:3px; }
+.invoice-signoff__for { font-weight:600; font-size:13px; }
+.invoice-signoff__rule { border-bottom:1px solid var(--border-strong); height:38px;
+  margin:2px 0 5px auto; max-width:220px; }
 .invoice-totals { margin-left:auto; margin-top:16px; width:min(320px,100%); }
 .invoice-totals__row { display:flex; justify-content:space-between; padding:6px 0; font-size:13.5px; }
 .invoice-totals__row--grand { border-top:2px solid var(--border-strong); margin-top:6px;

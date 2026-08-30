@@ -223,7 +223,7 @@ export async function invoiceDetailView({ id }) {
           text: company.company_name || 'DreamFly Consultancy',
         });
         logo.addEventListener('error', () => { logo.hidden = true; name.hidden = false; });
-        return el('div', {}, [
+        return el('div', { class: 'invoice-sheet__from' }, [
           logo,
           name,
           el('div', { class: 'muted small' }, [
@@ -234,7 +234,7 @@ export async function invoiceDetailView({ id }) {
           ]),
         ]);
       })(),
-      el('div', { style: 'text-align:right' }, [
+      el('div', { class: 'invoice-sheet__meta' }, [
         el('div', { style: 'font-size:22px;font-weight:750;letter-spacing:.08em', text: 'INVOICE' }),
         el('div', { class: 'mono', style: 'font-size:15px;margin-top:4px', text: inv.invoice_no }),
         el('div', { class: 'muted small mt-1' }, [
@@ -258,18 +258,22 @@ export async function invoiceDetailView({ id }) {
     ]),
 
     el('table', {}, [
+      el('colgroup', {}, [
+        el('col', { class: 'c-num' }), el('col'), el('col', { class: 'c-qty' }),
+        el('col', { class: 'c-price' }), el('col', { class: 'c-amount' }),
+      ]),
       el('thead', {}, el('tr', {}, [
         el('th', { text: '#' }), el('th', { text: 'Description' }),
-        el('th', { style: 'text-align:right', text: 'Qty' }),
-        el('th', { style: 'text-align:right', text: 'Unit price' }),
-        el('th', { style: 'text-align:right', text: 'Amount' }),
+        el('th', { class: 'num', text: 'Qty' }),
+        el('th', { class: 'num', text: 'Unit price' }),
+        el('th', { class: 'num', text: 'Amount' }),
       ])),
       el('tbody', {}, res.items.map((it, i) => el('tr', {}, [
         el('td', { text: String(i + 1) }),
         el('td', { text: it.description }),
-        el('td', { class: 'mono', style: 'text-align:right', text: String(it.quantity) }),
-        el('td', { class: 'mono', style: 'text-align:right', text: Number(it.unit_price).toFixed(2) }),
-        el('td', { class: 'mono', style: 'text-align:right', text: Number(it.amount).toFixed(2) }),
+        el('td', { class: 'mono num', text: String(it.quantity) }),
+        el('td', { class: 'mono num', text: Number(it.unit_price).toFixed(2) }),
+        el('td', { class: 'mono num', text: Number(it.amount).toFixed(2) }),
       ]))),
     ]),
 
@@ -290,8 +294,25 @@ export async function invoiceDetailView({ id }) {
     el('div', { class: 'mt-2 muted small', style: 'border-top:1px solid var(--border);padding-top:14px' }, [
       company.invoice_terms || '', el('br'), company.invoice_footer || '',
     ]),
+
+    el('div', { class: 'invoice-signoff' }, [
+      el('div', {}, [
+        el('div', { class: 'kv__label', text: 'Prepared by' }),
+        el('div', { class: 'invoice-signoff__name', text: inv.created_by_name || '—' }),
+        el('div', { class: 'faint small', text: fmtDate(inv.created_at) }),
+      ]),
+      el('div', { class: 'invoice-signoff__right' }, [
+        // Company first, then room to sign, then the caption — the order a
+        // signature block is normally read and signed in.
+        el('div', { class: 'invoice-signoff__for', text: `For ${company.company_name || 'DreamFly Consultancy'}` }),
+        el('div', { class: 'invoice-signoff__rule' }),
+        el('div', { class: 'kv__label', text: 'Authorised signature' }),
+      ]),
+    ]),
   ]);
 
+  // Internal record — the invoice a client receives shows Paid and Balance due,
+  // not the office's payment log or its buttons.
   const paymentsCard = card('Payments received', table({
     columns: [
       { label: 'Date', render: (p) => fmtDate(p.paid_at) },
@@ -316,6 +337,7 @@ export async function invoiceDetailView({ id }) {
     class: 'btn btn--sm btn--accent', text: '+ Record payment',
     onClick: () => paymentForm(inv, refresh),
   }) : null });
+  paymentsCard.classList.add('no-print');
 
   return el('div', { class: 'stack' }, [
     el('div', { class: 'flex no-print' }, [
