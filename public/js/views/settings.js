@@ -274,6 +274,10 @@ async function notificationsPanel() {
     toggle('notify_interview_reminder', 'Interview date reminders', 'Three days ahead of an interview'),
     toggle('notify_payment_due', 'Payment due alerts', 'Notifies admin, managers and accounts'),
     toggle('notify_missing_documents', 'Missing document alerts', 'For files that are ready or already submitted'),
+    { name: 'public_tracking', label: 'Public application tracking', type: 'select', required: true,
+      options: [{ value: '1', label: 'On' }, { value: '0', label: 'Off' }],
+      value: s.public_tracking === '0' ? '0' : '1',
+      hint: 'Lets clients check their own status at /track.html using passport number and date of birth' },
   ], {
     title: 'Notification settings',
     description: 'The system checks for these conditions every minute and raises in-app notifications.',

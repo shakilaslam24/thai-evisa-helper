@@ -25,19 +25,41 @@ function sweepFollowups() {
         WHEN 'partner'   THEN (SELECT partner_name FROM partners WHERE id = f.entity_id)
         WHEN 'case_file' THEN (SELECT reference_no FROM case_files WHERE id = f.entity_id)
       END AS entity_name
+      , (SELECT name FROM users WHERE id = f.assigned_to) AS assigned_name
     FROM followups f
     WHERE f.status = 'Pending' AND f.due_at <= datetime('now','localtime')
   `).all();
 
+  const today = new Date().toISOString().slice(0, 10);
+  const supervisors = adminAndManagerIds();
+
   for (const f of due) {
-    const overdue = new Date(f.due_at) < new Date(Date.now() - 3600000);
+    const dueAt = new Date(String(f.due_at).replace(' ', 'T'));
+    const daysLate = Math.floor((Date.now() - dueAt.getTime()) / 86400000);
+    const overdue = dueAt < new Date(Date.now() - 3600000);
+
     fanOut([f.assigned_to], {
       type: overdue ? 'followup_overdue' : 'followup_due',
-      title: overdue ? 'Overdue follow-up' : 'Follow-up due now',
+      title: overdue
+        ? `Overdue follow-up${daysLate >= 1 ? ` — ${daysLate} day${daysLate > 1 ? 's' : ''} late` : ''}`
+        : 'Follow-up due now',
       body: `${f.entity_name || 'Record'} — ${f.note || 'No note'} (${f.due_at})`,
       link: '#/followups',
-      dedupeKey: `followup:${f.id}:${overdue ? 'overdue' : 'due'}`,
+      // Dated key: a still-open item raises a fresh reminder every day rather
+      // than notifying once and then falling silent.
+      dedupeKey: `followup:${f.id}:${overdue ? `overdue:${today}` : 'due'}`,
     });
+
+    // Two days late means the assignee is not acting on it — tell a manager.
+    if (daysLate >= 2) {
+      fanOut(supervisors, {
+        type: 'followup_escalated',
+        title: `Follow-up ${daysLate} days late`,
+        body: `${f.entity_name || 'Record'} — assigned to ${f.assigned_name || 'nobody'}`,
+        link: '#/followups?due=overdue',
+        dedupeKey: `followup-escalated:${f.id}:${today}`,
+      });
+    }
   }
   return due.length;
 }
@@ -86,7 +108,7 @@ function sweepInterviews() {
       title: `Interview on ${f.interview_date}`,
       body: `${f.reference_no} · ${f.customer_name || 'Customer'}`,
       link: `#/files/${f.id}`,
-      dedupeKey: `interview:${f.id}:${f.interview_date}`,
+      dedupeKey: `interview:${f.id}:${f.interview_date}:${new Date().toISOString().slice(0, 10)}`,
     });
   }
   return rows.length;
@@ -94,21 +116,28 @@ function sweepInterviews() {
 
 function sweepPaymentDues() {
   const rows = db.prepare(`
-    SELECT i.id, i.invoice_no, i.due_date, i.total, i.paid, i.currency, i.created_by
+    SELECT i.id, i.invoice_no, i.due_date, i.total, i.paid, i.currency, i.created_by,
+           COALESCE(p.partner_name, trim(c.given_name || ' ' || COALESCE(c.surname,''))) AS customer_label
     FROM invoices i
+    LEFT JOIN customers c ON c.id = i.customer_id
+    LEFT JOIN partners p ON p.id = i.partner_id
     WHERE i.status IN ('Unpaid','Partial Paid')
       AND i.due_date IS NOT NULL AND date(i.due_date) <= date('now','localtime')
   `).all();
 
   const finance = db.prepare("SELECT id FROM users WHERE active = 1 AND role IN ('admin','manager','accounts')")
     .all().map((r) => r.id);
+  const today = new Date().toISOString().slice(0, 10);
   for (const i of rows) {
+    const daysLate = Math.floor(
+      (Date.now() - new Date(String(i.due_date).replace(' ', 'T')).getTime()) / 86400000
+    );
     fanOut([...finance, i.created_by], {
       type: 'payment_due',
-      title: `Payment overdue: ${i.invoice_no}`,
-      body: `${i.currency} ${(i.total - i.paid).toFixed(2)} outstanding since ${i.due_date}`,
+      title: `Payment overdue: ${i.invoice_no}${daysLate > 0 ? ` (${daysLate} day${daysLate > 1 ? 's' : ''})` : ''}`,
+      body: `${i.currency} ${(i.total - i.paid).toFixed(2)} outstanding${i.customer_label ? ` from ${i.customer_label}` : ''} since ${i.due_date}`,
       link: `#/invoices/${i.id}`,
-      dedupeKey: `invoice-due:${i.id}:${i.due_date}`,
+      dedupeKey: `invoice-due:${i.id}:${today}`,
     });
   }
   return rows.length;

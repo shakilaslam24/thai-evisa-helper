@@ -27,12 +27,16 @@ app.use(loadUser);
 // A cookie-authenticated API needs its own CSRF guard on state-changing calls.
 app.use('/api', (req, res, next) => {
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
+  // Public tracking carries no session, so there is no authority to forge. It is
+  // protected by requiring two matching details and by its own rate limit.
+  if (req.path.startsWith('/track')) return next();
   if (req.get('X-Requested-With') !== 'DreamFlyCRM') {
     return res.status(403).json({ error: 'Missing request header — please reload the page' });
   }
   next();
 });
 
+app.use('/api/track', require('./routes/track'));   // public — no login required
 app.use('/api/auth', require('./routes/auth').router);
 app.use('/api/users', require('./routes/users'));
 app.use('/api/settings', require('./routes/settings').router);

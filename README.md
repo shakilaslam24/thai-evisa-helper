@@ -79,12 +79,13 @@ inside the app under **Settings**.
 | **Customers** | Full traveller profile, passport and NID details, linked B2B partner, files, invoices, documents and activity history. |
 | **Files / Cases** | Auto-generated reference numbers, twelve-stage status tracking, submission/embassy/interview/completion dates, per-file document checklist. |
 | **B2B Partners** | Company and personal contacts, trade licence, commission and agreement notes, plus a partner dashboard of files, approvals, rejections, invoices and payments. Includes the one-step "add file under partner" entry. |
-| **Documents** | Upload, categorise, preview, download and delete files against any record; missing-document tracking per case file. |
+| **Documents** | Upload, categorise, preview, download and delete files against any record; every document lists whose it is (name, passport, file reference), is searchable by those, and filterable by who uploaded it. Missing-document tracking per case file. |
 | **Invoices** | Automatic numbering, line items, discount and tax, print and PDF output, per-file and per-partner billing. |
 | **Payments** | Part payments, seven payment methods, automatic invoice and file payment-status roll-up. |
 | **Reports** | Twelve reports covering leads, conversion, sources, follow-up, files, countries, partners, invoices, dues, collections and staff — each exportable to CSV. |
 | **Staff performance** | Leads handled, conversions, follow-ups completed, overdue items, meetings, files, approvals, rejections and revenue per team member. |
-| **Notifications** | In-app alerts for due and overdue follow-up, meeting reminders, interview dates, payment dues and missing documents. |
+| **Notifications** | In-app alerts for due and overdue follow-up, meeting reminders, interview dates, payment dues and missing documents. Overdue items re-notify daily rather than once, escalate to managers after two days, show an unread count in the browser tab, and can pop desktop alerts. |
+| **Client tracking** | A public page at `/track.html` where a client enters their passport number and date of birth to see their own application status, key dates and outstanding documents — no login, rate limited, and carrying none of the internal record. |
 | **Settings** | Company profile, invoice and file-reference numbering, nine editable dropdown lists (countries, services, lead sources, document categories, payment methods, meeting types, the default file checklist, plus custom lead and file statuses), users and roles, notification switches. |
 
 ## User roles

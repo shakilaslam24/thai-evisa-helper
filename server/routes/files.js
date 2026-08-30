@@ -32,7 +32,7 @@ const LABELS = {
 
 const SELECT = `
   SELECT f.*, trim(c.given_name || ' ' || COALESCE(c.surname,'')) AS customer_name,
-         c.passport_no, c.phone AS customer_phone, c.email AS customer_email,
+         c.passport_no, c.dob AS customer_dob, c.phone AS customer_phone, c.email AS customer_email,
          p.partner_name, u.name AS assigned_name, cb.name AS created_by_name,
          (SELECT COUNT(*) FROM document_checklist dc
            WHERE dc.case_file_id = f.id AND dc.status = 'Missing') AS missing_documents,

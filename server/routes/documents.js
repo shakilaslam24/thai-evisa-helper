@@ -77,21 +77,52 @@ function guardDocumentScope(req, entityType, entityId) {
 }
 
 router.get('/', wrap((req, res) => {
-  const { entity_type, entity_id, category, search } = req.query;
+  const { entity_type, entity_id, category, search, uploaded_by } = req.query;
   if (req.user.role === 'partner') {
     if (!entity_type || !entity_id) {
       throw new HttpError(403, 'Open one of your own records to see its documents');
     }
     guardDocumentScope(req, entity_type, Number(entity_id));
   }
-  const sql = [`SELECT d.*, u.name AS uploaded_by_name FROM documents d
-                LEFT JOIN users u ON u.id = d.uploaded_by`];
+  // Resolve who each document belongs to, so a long list can be read at a
+  // glance instead of showing "File #2".
+  const sql = [`
+    SELECT d.*, u.name AS uploaded_by_name,
+      CASE d.entity_type
+        WHEN 'customer'  THEN (SELECT trim(given_name || ' ' || COALESCE(surname,'')) FROM customers WHERE id = d.entity_id)
+        WHEN 'lead'      THEN (SELECT full_name FROM leads WHERE id = d.entity_id)
+        WHEN 'partner'   THEN (SELECT partner_name FROM partners WHERE id = d.entity_id)
+        WHEN 'case_file' THEN (SELECT trim(c.given_name || ' ' || COALESCE(c.surname,''))
+                               FROM case_files f LEFT JOIN customers c ON c.id = f.customer_id
+                               WHERE f.id = d.entity_id)
+      END AS owner_name,
+      CASE d.entity_type
+        WHEN 'customer'  THEN (SELECT passport_no FROM customers WHERE id = d.entity_id)
+        WHEN 'case_file' THEN (SELECT c.passport_no FROM case_files f
+                               LEFT JOIN customers c ON c.id = f.customer_id WHERE f.id = d.entity_id)
+      END AS owner_passport,
+      CASE d.entity_type
+        WHEN 'case_file' THEN (SELECT reference_no FROM case_files WHERE id = d.entity_id)
+      END AS reference_no
+    FROM documents d
+    LEFT JOIN users u ON u.id = d.uploaded_by`];
   const where = [];
   const params = [];
   if (entity_type) { where.push('d.entity_type = ?'); params.push(entity_type); }
   if (entity_id) { where.push('d.entity_id = ?'); params.push(Number(entity_id)); }
   if (category) { where.push('d.category = ?'); params.push(category); }
-  if (search) { where.push('d.original_name LIKE ?'); params.push(`%${search}%`); }
+  if (uploaded_by) { where.push('d.uploaded_by = ?'); params.push(Number(uploaded_by)); }
+  if (search) {
+    // Searching by the traveller's name or passport matters more than the file name.
+    const like = `%${search}%`;
+    where.push(`(d.original_name LIKE ?
+      OR EXISTS (SELECT 1 FROM customers c WHERE c.id = d.entity_id AND d.entity_type = 'customer'
+                 AND (c.given_name LIKE ? OR c.surname LIKE ? OR c.passport_no LIKE ?))
+      OR EXISTS (SELECT 1 FROM case_files f LEFT JOIN customers c ON c.id = f.customer_id
+                 WHERE f.id = d.entity_id AND d.entity_type = 'case_file'
+                 AND (c.given_name LIKE ? OR c.surname LIKE ? OR c.passport_no LIKE ? OR f.reference_no LIKE ?)))`);
+    params.push(like, like, like, like, like, like, like, like);
+  }
   if (where.length) sql.push(`WHERE ${where.join(' AND ')}`);
   sql.push('ORDER BY d.created_at DESC LIMIT 500');
   res.json({ data: db.prepare(sql.join(' ')).all(...params) });

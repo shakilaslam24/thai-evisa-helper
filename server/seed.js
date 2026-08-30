@@ -16,6 +16,7 @@ const DEFAULT_SETTINGS = {
   company_logo_url: '',
   invoice_prefix: 'DF-INV',
   file_prefix: 'DF',
+  public_tracking: '1',
   invoice_currency: 'BDT',
   invoice_footer: 'Thank you for choosing DreamFly Consultancy.',
   invoice_terms: 'Payment is due within 7 days of the invoice date.',

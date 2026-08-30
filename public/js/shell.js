@@ -228,12 +228,76 @@ function updateNotifyBadge() {
   }
 }
 
+const BASE_TITLE = 'DreamFly Consultancy CRM';
+let lastSeenId = 0;
+let primedFromServer = false;
+
+/** Unread count in the browser tab, so it is visible from another tab. */
+function updateTabTitle() {
+  document.title = store.unread > 0 ? `(${store.unread}) ${BASE_TITLE}` : BASE_TITLE;
+}
+
+export function desktopAlertsEnabled() {
+  try {
+    return localStorage.getItem('dreamfly-desktop-alerts') === '1'
+      && 'Notification' in window && Notification.permission === 'granted';
+  } catch { return false; }
+}
+
+/** Asks the browser for permission, which it only grants on a real click. */
+export async function enableDesktopAlerts() {
+  if (!('Notification' in window)) {
+    toast('This browser cannot show desktop alerts', 'err');
+    return false;
+  }
+  const permission = Notification.permission === 'granted'
+    ? 'granted'
+    : await Notification.requestPermission();
+  if (permission !== 'granted') {
+    toast('Desktop alerts were blocked in the browser settings', 'err');
+    return false;
+  }
+  try { localStorage.setItem('dreamfly-desktop-alerts', '1'); } catch { /* private mode */ }
+  new Notification('DreamFly CRM', { body: 'Desktop alerts are on. You will be told about due follow-ups and payments.' });
+  return true;
+}
+
+export function disableDesktopAlerts() {
+  try { localStorage.setItem('dreamfly-desktop-alerts', '0'); } catch { /* ignore */ }
+}
+
+function popDesktopAlerts(items) {
+  if (!desktopAlertsEnabled()) return;
+  // Never bury the screen: show the newest few, then a summary line.
+  for (const n of items.slice(0, 3)) {
+    const note = new Notification(n.title, { body: n.body || '', tag: `dreamfly-${n.id}` });
+    note.onclick = () => {
+      window.focus();
+      if (n.link) window.location.hash = n.link.replace(/^#/, '');
+      note.close();
+    };
+  }
+  if (items.length > 3) {
+    new Notification(`${items.length - 3} more reminders`, {
+      body: 'Open the notifications page to see them all.', tag: 'dreamfly-more',
+    });
+  }
+}
+
 export async function refreshNotifications() {
   try {
-    const res = await api.get('/api/notifications/count');
-    store.unread = res.data.unread;
+    const res = await api.get('/api/notifications?unread=1');
+    store.unread = res.unread;
     updateNotifyBadge();
+    updateTabTitle();
     renderNav();
+
+    const fresh = res.data.filter((n) => n.id > lastSeenId);
+    if (res.data.length) lastSeenId = Math.max(lastSeenId, ...res.data.map((n) => n.id));
+    // The first poll after a page load is the existing backlog, not news —
+    // alerting on it would fire every time someone opens the app.
+    if (primedFromServer && fresh.length) popDesktopAlerts(fresh);
+    primedFromServer = true;
   } catch { /* a failed poll should never interrupt the user */ }
 }
 
@@ -246,6 +310,15 @@ function openUserMenu() {
     el('div', { class: 'dropdown__body' }, [
       el('button', { class: 'dropdown__item', text: 'Change password', onClick: () => { closeDropdown(); changePassword(); } }),
       el('button', { class: 'dropdown__item', text: `Theme: ${themeLabel()}`, onClick: (e) => { cycleTheme(); e.target.textContent = `Theme: ${themeLabel()}`; } }),
+      el('button', {
+        class: 'dropdown__item',
+        text: `Desktop alerts: ${desktopAlertsEnabled() ? 'on' : 'off'}`,
+        onClick: async (e) => {
+          if (desktopAlertsEnabled()) { disableDesktopAlerts(); toast('Desktop alerts turned off'); }
+          else if (await enableDesktopAlerts()) toast('Desktop alerts turned on');
+          e.target.textContent = `Desktop alerts: ${desktopAlertsEnabled() ? 'on' : 'off'}`;
+        },
+      }),
       can('settings') ? el('a', { class: 'dropdown__item', href: '#/settings', text: 'Settings', onClick: closeDropdown }) : null,
       el('button', { class: 'dropdown__item', text: 'Sign out', onClick: signOut }),
     ]),
