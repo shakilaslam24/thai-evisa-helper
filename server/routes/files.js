@@ -1,6 +1,7 @@
 'use strict';
 const express = require('express');
 const { db } = require('../db');
+const vocab = require('../vocab');
 const { requireAuth, canWrite } = require('../auth');
 const {
   wrap, bad, notFound, pick, requireFields, oneOf, paging, orderBy, conditions,
@@ -44,10 +45,13 @@ const SELECT = `
   LEFT JOIN users cb ON cb.id = f.created_by
 `;
 
-/** Reference numbers look like DF-2026-0007 and never reuse a retired number. */
+/**
+ * Reference numbers look like DF-2026-0007 and never reuse a retired number.
+ * The "DF" part is the `file_prefix` setting, so a company can use its own.
+ */
 function nextReferenceNo() {
   const year = new Date().getFullYear();
-  const prefix = `DF-${year}-`;
+  const prefix = `${vocab.setting('file_prefix', 'DF')}-${year}-`;
   const last = db.prepare(
     'SELECT reference_no FROM case_files WHERE reference_no LIKE ? ORDER BY id DESC LIMIT 1'
   ).get(`${prefix}%`);
@@ -120,7 +124,7 @@ router.get('/:id', wrap((req, res) => {
 router.post('/', canWrite('files'), wrap((req, res) => {
   requireFields(req.body, ['customer_id']);
   const data = pick(req.body, FIELDS);
-  oneOf(data.status, FILE_STATUSES, 'status');
+  oneOf(data.status, vocab.values('file_status'), 'status');
   oneOf(data.payment_status, PAYMENT_STATUSES, 'payment status');
   data.status ||= 'Draft';
   data.payment_status ||= 'Unpaid';
@@ -151,7 +155,7 @@ router.post('/', canWrite('files'), wrap((req, res) => {
     const id = info.lastInsertRowid;
     // Seed the standard document checklist so nothing is silently forgotten.
     const add = db.prepare('INSERT INTO document_checklist (case_file_id, name) VALUES (?, ?)');
-    for (const name of DEFAULT_CHECKLIST_ITEMS) add.run(id, name);
+    for (const name of vocab.values('checklist_item')) add.run(id, name);
     return id;
   });
 
@@ -172,7 +176,7 @@ router.post('/partner-entry', canWrite('files'), wrap((req, res) => {
   const b = req.body;
   const partnerId = Number(b.partner_id);
   if (!db.prepare('SELECT 1 FROM partners WHERE id = ?').get(partnerId)) bad('Partner not found');
-  oneOf(b.status || null, FILE_STATUSES, 'status');
+  oneOf(b.status || null, vocab.values('file_status'), 'status');
 
   const run = db.transaction(() => {
     let customer = b.passport_no
@@ -210,7 +214,7 @@ router.post('/partner-entry', canWrite('files'), wrap((req, res) => {
     });
     const fileId = fileInfo.lastInsertRowid;
     const add = db.prepare('INSERT INTO document_checklist (case_file_id, name) VALUES (?, ?)');
-    for (const name of DEFAULT_CHECKLIST_ITEMS) add.run(fileId, name);
+    for (const name of vocab.values('checklist_item')) add.run(fileId, name);
     return { customerId: customer.id, fileId };
   });
 
@@ -226,7 +230,7 @@ router.put('/:id', canWrite('files'), wrap((req, res) => {
   const before = db.prepare('SELECT * FROM case_files WHERE id = ?').get(id);
   if (!before) notFound('File not found');
   const data = pick(req.body, FIELDS);
-  oneOf(data.status, FILE_STATUSES, 'status');
+  oneOf(data.status, vocab.values('file_status'), 'status');
   oneOf(data.payment_status, PAYMENT_STATUSES, 'payment status');
   data.status ||= before.status;
   data.payment_status ||= before.payment_status;
@@ -258,7 +262,7 @@ router.patch('/:id/status', canWrite('files'), wrap((req, res) => {
   const id = Number(req.params.id);
   const file = db.prepare('SELECT * FROM case_files WHERE id = ?').get(id);
   if (!file) notFound('File not found');
-  const status = oneOf(req.body.status, FILE_STATUSES, 'status');
+  const status = oneOf(req.body.status, vocab.values('file_status'), 'status');
   if (!status) bad('Status is required');
 
   const patch = { status, id, completion_date: file.completion_date };

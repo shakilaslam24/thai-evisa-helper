@@ -1,6 +1,7 @@
 'use strict';
 const express = require('express');
 const { db } = require('../db');
+const vocab = require('../vocab');
 const { requireAuth, canWrite, denyPartner } = require('../auth');
 const {
   wrap, bad, notFound, pick, requireFields, oneOf, paging, orderBy, conditions,
@@ -70,7 +71,7 @@ router.post('/', canWrite('leads'), wrap((req, res) => {
   requireFields(req.body, ['full_name']);
   const data = pick(req.body, FIELDS);
   oneOf(data.priority, LEAD_PRIORITIES, 'priority');
-  oneOf(data.status, LEAD_STATUSES, 'status');
+  oneOf(data.status, vocab.values('lead_status'), 'status');
   data.priority ||= 'Warm';
   data.status ||= 'New Lead';
   data.assigned_to = data.assigned_to ? Number(data.assigned_to) : req.user.id;
@@ -108,7 +109,7 @@ router.put('/:id', canWrite('leads'), wrap((req, res) => {
 
   const data = pick(req.body, FIELDS);
   oneOf(data.priority, LEAD_PRIORITIES, 'priority');
-  oneOf(data.status, LEAD_STATUSES, 'status');
+  oneOf(data.status, vocab.values('lead_status'), 'status');
   data.priority ||= before.priority;
   data.status ||= before.status;
   data.assigned_to = data.assigned_to ? Number(data.assigned_to) : null;
@@ -137,7 +138,7 @@ router.patch('/:id/status', canWrite('leads'), wrap((req, res) => {
   const id = Number(req.params.id);
   const lead = db.prepare('SELECT * FROM leads WHERE id = ?').get(id);
   if (!lead) notFound('Lead not found');
-  const status = oneOf(req.body.status, LEAD_STATUSES, 'status');
+  const status = oneOf(req.body.status, vocab.values('lead_status'), 'status');
   if (!status) bad('Status is required');
 
   db.prepare("UPDATE leads SET status = ?, updated_at = datetime('now') WHERE id = ?").run(status, id);

@@ -78,17 +78,27 @@ async function invoicePanel() {
   return settingsForm([
     { name: 'invoice_prefix', label: 'Invoice number prefix', value: s.invoice_prefix,
       hint: 'Numbers are generated as PREFIX-YEAR-0001' },
+    { name: 'file_prefix', label: 'File reference prefix', value: s.file_prefix,
+      hint: 'File references become PREFIX-YEAR-0001, e.g. DF-2026-0007' },
     { name: 'invoice_currency', label: 'Default currency', value: s.invoice_currency },
     { name: 'invoice_terms', label: 'Payment terms', type: 'textarea', span: true, value: s.invoice_terms },
     { name: 'invoice_footer', label: 'Invoice footer note', type: 'textarea', span: true, value: s.invoice_footer },
-  ], { title: 'Invoice template', description: 'Shown at the bottom of every invoice you print or export.' });
+  ], {
+    title: 'Invoice & reference numbering',
+    description: 'Numbering and the wording shown on every invoice you print or export.',
+  });
 }
 
 const LIST_TYPES = [
-  ['country', 'Countries'],
-  ['service', 'Service categories'],
-  ['lead_source', 'Lead sources'],
-  ['document_category', 'Document categories'],
+  ['country', 'Countries', 'Shown wherever a destination is chosen'],
+  ['service', 'Service categories', 'Tourist visa, tour package, work package…'],
+  ['lead_source', 'Lead sources', 'Where your enquiries come from'],
+  ['document_category', 'Document categories', 'Used when uploading a document'],
+  ['payment_method', 'Payment methods', 'Cash, bKash, Nagad, bank transfer…'],
+  ['meeting_type', 'Meeting types', 'Office visit, phone call, video call…'],
+  ['checklist_item', 'Default document checklist', 'Added to every new file automatically'],
+  ['lead_status', 'Lead statuses', 'Built-in stages cannot be removed — add your own'],
+  ['file_status', 'File statuses', 'Built-in stages cannot be removed — add your own'],
 ];
 
 async function listsPanel() {
@@ -96,26 +106,40 @@ async function listsPanel() {
 
   const render = () => {
     clear(host);
-    for (const [type, label] of LIST_TYPES) {
+    for (const [type, label, hint] of LIST_TYPES) {
       const items = store.lookups[type] || [];
       const list = el('div', {}, items.map((item) => el('div', { class: 'checkline' }, [
-        el('div', { class: 'checkline__name', text: item.value }),
-        el('button', {
-          class: 'btn btn--sm btn--ghost', text: '✕', title: 'Remove from list',
-          onClick: async () => {
-            if (!await confirmDialog(`Remove "${item.value}" from ${label}? Records already using it keep the value.`)) return;
-            try {
-              await api.del(`/api/settings/lookups/${item.id}`);
-              await loadReferenceData();
-              toast('Removed');
-              render();
-            } catch (err) { toastError(err); }
-          },
-        }),
+        el('div', { class: 'checkline__name' }, [
+          el('div', { text: item.value }),
+          item.locked ? el('div', { class: 'cell-sub', text: 'Built-in' }) : null,
+        ]),
+        item.locked
+          // Built-in values drive the dashboard and reports, so they stay put.
+          ? el('span', { class: 'faint', title: 'Built-in value — reports depend on it', text: '🔒' })
+          : el('button', {
+            class: 'btn btn--sm btn--ghost', text: '✕', title: 'Remove from list',
+            onClick: async () => {
+              if (!await confirmDialog(`Remove "${item.value}" from ${label}? Records already using it keep the value.`)) return;
+              try {
+                await api.del(`/api/settings/lookups/${item.id}`);
+                await loadReferenceData();
+                toast('Removed');
+                render();
+              } catch (err) { toastError(err); }
+            },
+          }),
       ])));
       if (!items.length) list.append(el('div', { class: 'empty', text: 'This list is empty' }));
 
-      host.append(card(`${label} (${items.length})`, list, {
+      // A long list (countries especially) would otherwise dominate the page.
+      const scroller = el('div', {
+        style: 'max-height:340px;overflow-y:auto;margin:0 -4px;padding:0 4px',
+      }, list);
+
+      host.append(card(`${label} (${items.length})`, [
+        hint ? el('p', { class: 'faint small mt-0', text: hint }) : null,
+        scroller,
+      ], {
         actions: el('button', {
           class: 'btn btn--sm btn--primary', text: '+ Add',
           onClick: () => formModal({

@@ -1,6 +1,7 @@
 'use strict';
 const express = require('express');
 const { db } = require('../db');
+const vocab = require('../vocab');
 const { requireAuth, canWrite } = require('../auth');
 const {
   wrap, bad, notFound, paging, orderBy, conditions, logActivity, toNumber, clean, todayISO,
@@ -71,7 +72,7 @@ router.post('/', canWrite('payments'), wrap((req, res) => {
     bad(`That is more than the ${outstanding} still outstanding on this invoice`);
   }
   const method = clean(req.body.method) || 'Cash';
-  if (!PAYMENT_METHODS.includes(method)) bad(`Unknown payment method: "${method}"`);
+  if (!vocab.values('payment_method').includes(method)) bad(`Unknown payment method: "${method}"`);
 
   const info = db.prepare(`
     INSERT INTO payments (invoice_id, amount, method, paid_at, reference, note, received_by)

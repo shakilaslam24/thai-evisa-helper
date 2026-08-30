@@ -4,6 +4,7 @@ const { db } = require('../db');
 const { requireAuth, canWrite } = require('../auth');
 const { wrap, bad, clean, logActivity } = require('../helpers');
 const C = require('../constants');
+const vocab = require('../vocab');
 
 const router = express.Router();
 router.use(requireAuth);
@@ -12,6 +13,7 @@ const COMPANY_KEYS = [
   'company_name', 'company_tagline', 'company_address', 'company_phone',
   'company_phone_alt', 'company_email', 'company_website', 'company_logo_url',
   'invoice_prefix', 'invoice_currency', 'invoice_footer', 'invoice_terms',
+  'file_prefix',
   'notify_followup_due', 'notify_meeting_reminder', 'notify_payment_due',
   'notify_interview_reminder', 'notify_missing_documents',
 ];
@@ -42,25 +44,40 @@ router.put('/', canWrite('settings'), wrap((req, res) => {
 
 /* ------------------------------ lookup lists ------------------------------ */
 
-const LOOKUP_TYPES = ['country', 'service', 'lead_source', 'document_category'];
+const LOOKUP_TYPES = vocab.ALL_TYPES;
 
 router.get('/lookups', wrap((req, res) => {
   const rows = db.prepare('SELECT * FROM lookups WHERE active = 1 ORDER BY type, sort_order, value').all();
   const data = {};
-  for (const t of LOOKUP_TYPES) data[t] = [];
-  for (const r of rows) (data[r.type] ||= []).push({ id: r.id, value: r.value });
+  const locked = {};
+  for (const type of LOOKUP_TYPES) {
+    data[type] = [];
+    // Locked built-ins are shown first and carry no id, so the UI hides Delete.
+    for (const value of vocab.lockedValues(type)) {
+      data[type].push({ id: null, value, locked: true });
+    }
+    locked[type] = vocab.lockedValues(type);
+  }
+  for (const r of rows) {
+    if (!data[r.type]) continue;
+    if (locked[r.type].includes(r.value)) continue;
+    data[r.type].push({ id: r.id, value: r.value, locked: false });
+  }
+
   res.json({
     data,
-    // Fixed vocabularies the UI needs but that are not user-editable.
+    locked,
+    // Vocabularies the UI needs. The editable ones reflect Settings; the rest are
+    // fixed because database constraints and permission rules depend on them.
     enums: {
-      lead_statuses: C.LEAD_STATUSES,
+      lead_statuses: vocab.values('lead_status'),
+      file_statuses: vocab.values('file_status'),
+      meeting_types: vocab.values('meeting_type'),
+      payment_methods: vocab.values('payment_method'),
       lead_priorities: C.LEAD_PRIORITIES,
-      file_statuses: C.FILE_STATUSES,
-      meeting_types: C.MEETING_TYPES,
       meeting_statuses: C.MEETING_STATUSES,
       partner_statuses: C.PARTNER_STATUSES,
       payment_statuses: C.PAYMENT_STATUSES,
-      payment_methods: C.PAYMENT_METHODS,
       checklist_statuses: C.CHECKLIST_STATUSES,
       roles: C.ROLES,
     },
@@ -70,7 +87,7 @@ router.get('/lookups', wrap((req, res) => {
 router.post('/lookups', canWrite('settings'), wrap((req, res) => {
   const type = clean(req.body.type);
   const value = clean(req.body.value);
-  if (!LOOKUP_TYPES.includes(type)) bad('Unknown list type');
+  if (!vocab.isEditableType(type)) bad('Unknown list type');
   if (!value) bad('Value is required');
   db.prepare(`INSERT INTO lookups (type, value, sort_order) VALUES (?, ?, 100)
               ON CONFLICT(type, value) DO UPDATE SET active = 1`).run(type, value);
@@ -81,6 +98,9 @@ router.post('/lookups', canWrite('settings'), wrap((req, res) => {
 router.delete('/lookups/:id', canWrite('settings'), wrap((req, res) => {
   const row = db.prepare('SELECT * FROM lookups WHERE id = ?').get(Number(req.params.id));
   if (!row) bad('List item not found');
+  if (vocab.lockedValues(row.type).includes(row.value)) {
+    bad(`"${row.value}" is a built-in value that reports depend on — it cannot be removed`);
+  }
   // Soft delete: existing records keep showing the value they were saved with.
   db.prepare('UPDATE lookups SET active = 0 WHERE id = ?').run(row.id);
   logActivity('settings', 0, 'List item removed', `${row.type}: ${row.value}`, req.user.id);

@@ -3,6 +3,7 @@ const crypto = require('crypto');
 const { db } = require('./db');
 const { hashPassword } = require('./auth');
 const C = require('./constants');
+const vocab = require('./vocab');
 
 const DEFAULT_SETTINGS = {
   company_name: 'DreamFly Consultancy',
@@ -14,6 +15,7 @@ const DEFAULT_SETTINGS = {
   company_website: '',
   company_logo_url: '',
   invoice_prefix: 'DF-INV',
+  file_prefix: 'DF',
   invoice_currency: 'BDT',
   invoice_footer: 'Thank you for choosing DreamFly Consultancy.',
   invoice_terms: 'Payment is due within 7 days of the invoice date.',
@@ -24,15 +26,18 @@ const DEFAULT_SETTINGS = {
   notify_missing_documents: '1',
 };
 
+/**
+ * Seeds the editable dropdown lists. Existing rows are left alone, so an admin's
+ * own edits survive every restart and upgrade.
+ */
 function seedLookups() {
   const insert = db.prepare(
     'INSERT OR IGNORE INTO lookups (type, value, sort_order) VALUES (?, ?, ?)'
   );
   const run = db.transaction(() => {
-    C.DEFAULT_COUNTRIES.forEach((v, i) => insert.run('country', v, i));
-    C.DEFAULT_SERVICES.forEach((v, i) => insert.run('service', v, i));
-    C.DEFAULT_LEAD_SOURCES.forEach((v, i) => insert.run('lead_source', v, i));
-    C.DEFAULT_DOC_CATEGORIES.forEach((v, i) => insert.run('document_category', v, i));
+    for (const [type, defaults] of Object.entries(vocab.EDITABLE)) {
+      defaults.forEach((value, i) => insert.run(type, value, i));
+    }
   });
   run();
 }

@@ -277,8 +277,13 @@ npm start
 - [ ] **Company details** — নাম, ঠিকানা, ফোন, ইমেইল সেভ হয়
 - [ ] সেভ করার পর invoice-এ নতুন তথ্য দেখাচ্ছে
 - [ ] **Invoice template** — prefix, currency, terms, footer সেভ হয়
-- [ ] **Countries, services & lists** — নতুন দেশ / সার্ভিস যোগ করা যায়
+- [ ] **Countries, services & lists** — ৯টা তালিকাই দেখাচ্ছে
+- [ ] নতুন দেশ / সার্ভিস / **পেমেন্ট মাধ্যম** / **মিটিং ধরন** যোগ করা যায়
 - [ ] যোগ করা দেশ Lead ও File ফর্মের ড্রপডাউনে চলে আসে
+- [ ] **Lead statuses**-এ নিজের status যোগ করুন → lead-এর ড্রপডাউনে আসে
+- [ ] বিল্ট-ইন status-এ 🔒 আছে, মোছার বাটন নেই
+- [ ] **Default document checklist**-এ আইটেম যোগ করুন → নতুন file-এ সেটা আসে
+- [ ] **Invoice template**-এ `File reference prefix` বদলান → নতুন file-এ নতুন prefix
 - [ ] একটা আইটেম Remove করলে ড্রপডাউন থেকে যায়, কিন্তু পুরনো রেকর্ড ঠিক থাকে
 - [ ] **Users & roles** — নতুন ইউজার তৈরি করা যায়
 - [ ] **Reset password** কাজ করে

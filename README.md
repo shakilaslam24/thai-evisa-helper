@@ -85,7 +85,7 @@ inside the app under **Settings**.
 | **Reports** | Twelve reports covering leads, conversion, sources, follow-up, files, countries, partners, invoices, dues, collections and staff — each exportable to CSV. |
 | **Staff performance** | Leads handled, conversions, follow-ups completed, overdue items, meetings, files, approvals, rejections and revenue per team member. |
 | **Notifications** | In-app alerts for due and overdue follow-up, meeting reminders, interview dates, payment dues and missing documents. |
-| **Settings** | Company profile, invoice template, editable country/service/source/document lists, users and roles, notification switches. |
+| **Settings** | Company profile, invoice and file-reference numbering, nine editable dropdown lists (countries, services, lead sources, document categories, payment methods, meeting types, the default file checklist, plus custom lead and file statuses), users and roles, notification switches. |
 
 ## User roles
 

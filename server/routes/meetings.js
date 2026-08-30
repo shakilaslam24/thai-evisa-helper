@@ -1,6 +1,7 @@
 'use strict';
 const express = require('express');
 const { db } = require('../db');
+const vocab = require('../vocab');
 const { requireAuth, canWrite, denyPartner } = require('../auth');
 const {
   wrap, bad, notFound, pick, requireFields, oneOf, paging, orderBy, conditions,
@@ -48,7 +49,7 @@ router.post('/', canWrite('meetings'), wrap((req, res) => {
   const data = pick(req.body, [
     'title', 'entity_type', 'entity_id', 'meeting_at', 'meeting_type', 'assigned_to', 'notes',
   ]);
-  oneOf(data.meeting_type, MEETING_TYPES, 'meeting type');
+  oneOf(data.meeting_type, vocab.values('meeting_type'), 'meeting type');
   data.meeting_type ||= 'Office Visit';
   data.entity_id = data.entity_id ? Number(data.entity_id) : null;
   data.assigned_to = data.assigned_to ? Number(data.assigned_to) : req.user.id;
@@ -87,7 +88,7 @@ router.put('/:id', canWrite('meetings'), wrap((req, res) => {
   const before = db.prepare('SELECT * FROM meetings WHERE id = ?').get(id);
   if (!before) notFound('Meeting not found');
   const data = pick(req.body, ['title', 'meeting_at', 'meeting_type', 'assigned_to', 'notes', 'status']);
-  oneOf(data.meeting_type, MEETING_TYPES, 'meeting type');
+  oneOf(data.meeting_type, vocab.values('meeting_type'), 'meeting type');
   oneOf(data.status, MEETING_STATUSES, 'status');
 
   db.prepare(`
