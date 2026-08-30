@@ -2,7 +2,7 @@
 const express = require('express');
 const { db } = require('../db');
 const vocab = require('../vocab');
-const { requireAuth, canWrite } = require('../auth');
+const { requireAuth, canWrite, seesAllMoney } = require('../auth');
 const {
   wrap, bad, notFound, paging, orderBy, conditions, logActivity, toNumber, clean, todayISO,
 } = require('../helpers');
@@ -20,6 +20,7 @@ const SELECT = `
   JOIN invoices i ON i.id = pay.invoice_id
   LEFT JOIN customers c ON c.id = i.customer_id
   LEFT JOIN partners p ON p.id = i.partner_id
+  LEFT JOIN case_files f ON f.id = i.case_file_id
   LEFT JOIN users u ON u.id = pay.received_by
 `;
 
@@ -27,6 +28,12 @@ router.get('/', wrap((req, res) => {
   const q = req.query;
   const w = conditions();
   if (req.user.role === 'partner') w.add('i.partner_id = ?', req.user.partner_id || -1);
+  // Payments against the customers and files they handle, plus anything they
+  // took in themselves, so a payment they recorded never vanishes from view.
+  else if (!seesAllMoney(req.user)) {
+    w.add('(pay.received_by = ? OR i.created_by = ? OR c.assigned_to = ? OR f.assigned_to = ?)',
+      req.user.id, req.user.id, req.user.id, req.user.id);
+  }
   if (q.search) {
     const like = `%${q.search}%`;
     w.add('(i.invoice_no LIKE ? OR c.given_name LIKE ? OR c.surname LIKE ? OR p.partner_name LIKE ? OR pay.reference LIKE ?)',
@@ -45,13 +52,15 @@ router.get('/', wrap((req, res) => {
     SELECT COUNT(*) n FROM payments pay
     JOIN invoices i ON i.id = pay.invoice_id
     LEFT JOIN customers c ON c.id = i.customer_id
-    LEFT JOIN partners p ON p.id = i.partner_id ${w.where()}
+    LEFT JOIN partners p ON p.id = i.partner_id
+    LEFT JOIN case_files f ON f.id = i.case_file_id ${w.where()}
   `).get(...w.params).n;
   const collected = db.prepare(`
     SELECT COALESCE(SUM(pay.amount),0) s FROM payments pay
     JOIN invoices i ON i.id = pay.invoice_id
     LEFT JOIN customers c ON c.id = i.customer_id
-    LEFT JOIN partners p ON p.id = i.partner_id ${w.where()}
+    LEFT JOIN partners p ON p.id = i.partner_id
+    LEFT JOIN case_files f ON f.id = i.case_file_id ${w.where()}
   `).get(...w.params).s;
   const data = db.prepare(`${SELECT} ${w.where()} ORDER BY ${sort}, pay.id DESC LIMIT ? OFFSET ?`)
     .all(...w.params, limit, offset);

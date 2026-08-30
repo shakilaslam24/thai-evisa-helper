@@ -113,6 +113,16 @@ function denyPartner(req, res, next) {
   next();
 }
 
+/**
+ * Two separate questions, deliberately kept apart:
+ *   - who may see the whole company's *work* (leads, files, customers)
+ *   - who may see the whole company's *money*
+ * Accounts belongs in the second but not the first: producing financial
+ * summaries is that role's job, while the sales pipeline is not.
+ */
+const seesAllWork = (user) => ['admin', 'manager'].includes(user?.role);
+const seesAllMoney = (user) => ['admin', 'manager', 'accounts'].includes(user?.role);
+
 /** canWrite('invoices') — enforces the module permission matrix. */
 function canWrite(moduleName) {
   return requireRole(...(WRITE_ACCESS[moduleName] || []));
@@ -122,4 +132,5 @@ module.exports = {
   SESSION_COOKIE, hashPassword, verifyPassword, createSession, destroySession,
   purgeExpiredSessions, readCookies, setSessionCookie, clearSessionCookie,
   loadUser, requireAuth, requireRole, canWrite, denyPartner,
+  seesAllWork, seesAllMoney,
 };

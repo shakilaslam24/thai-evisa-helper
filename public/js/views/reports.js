@@ -18,10 +18,17 @@ const REPORTS = [
   ['staff_performance', 'Staff performance', 'Team activity and results'],
 ];
 
-export default function reportsView() {
+export default async function reportsView() {
+  // The server decides which reports this role may run, so a staff member is
+  // never offered one that will come back refused.
+  const allowed = await api.get('/api/reports')
+    .then((r) => new Set(r.data.map((x) => x.key)))
+    .catch(() => new Set(REPORTS.map(([k]) => k)));
+  const available = REPORTS.filter(([key]) => allowed.has(key));
+
   const q = parseHash().query;
   const state = {
-    key: q.report || 'daily_leads',
+    key: allowed.has(q.report) ? q.report : (available[0]?.[0] || 'daily_leads'),
     from: q.date_from || firstOfMonth(),
     to: q.date_to || today(),
   };
@@ -64,7 +71,7 @@ export default function reportsView() {
   };
 
   const reportSelect = el('select', {},
-    REPORTS.map(([key, label]) => el('option', { value: key, text: label, selected: key === state.key })));
+    available.map(([key, label]) => el('option', { value: key, text: label, selected: key === state.key })));
   reportSelect.addEventListener('change', () => { state.key = reportSelect.value; sync(); });
 
   const fromInput = el('input', { type: 'date', value: state.from });
@@ -95,7 +102,7 @@ export default function reportsView() {
     quickRanges,
   ]));
 
-  const description = REPORTS.find(([k]) => k === state.key)?.[2] || '';
+  const description = available.find(([k]) => k === state.key)?.[2] || '';
 
   load();
 

@@ -1,8 +1,8 @@
 'use strict';
 const express = require('express');
 const { db } = require('../db');
-const { requireAuth, requireRole, denyPartner } = require('../auth');
-const { wrap, bad, conditions } = require('../helpers');
+const { requireAuth, requireRole, denyPartner, seesAllWork, seesAllMoney } = require('../auth');
+const { wrap, bad, conditions, HttpError } = require('../helpers');
 const { ACTIVE_FILE_STATUSES } = require('../constants');
 
 const router = express.Router();
@@ -16,9 +16,20 @@ function range(q) {
   return { from, to };
 }
 
+/**
+ * Reports a staff member has no business running at all: one lists every
+ * colleague's numbers, the other the company's partner billing.
+ */
+const PRIVILEGED_REPORTS = ['staff_performance', 'partner_wise'];
+
+/**
+ * Each builder receives (query, scope). `scope.mine` is the user id when the
+ * report must be narrowed to that person, or null for a company-wide view.
+ * `own(col)` appends the restriction; it returns '' when nothing is restricted.
+ */
 const REPORTS = {
   /* ---- leads ---- */
-  daily_leads: (q) => {
+  daily_leads: (q, sc) => {
     const { from, to } = range(q);
     return {
       title: 'Daily Lead Report',
@@ -27,19 +38,19 @@ const REPORTS = {
         SELECT date(created_at) AS d, COUNT(*) total,
                SUM(CASE WHEN status = 'Converted' THEN 1 ELSE 0 END) converted,
                SUM(CASE WHEN status = 'Not Interested' THEN 1 ELSE 0 END) lost
-        FROM leads WHERE date(created_at) BETWEEN date(?) AND date(?)
+        FROM leads WHERE date(created_at) BETWEEN date(?) AND date(?)${sc.own('assigned_to')}
         GROUP BY d ORDER BY d DESC
       `).all(from, to).map((r) => [r.d, r.total, r.converted, r.lost]),
       range: { from, to },
     };
   },
 
-  lead_conversion: (q) => {
+  lead_conversion: (q, sc) => {
     const { from, to } = range(q);
     const rows = db.prepare(`
       SELECT strftime('%Y-%m', created_at) AS m, COUNT(*) total,
              SUM(CASE WHEN status = 'Converted' THEN 1 ELSE 0 END) converted
-      FROM leads WHERE date(created_at) BETWEEN date(?) AND date(?)
+      FROM leads WHERE date(created_at) BETWEEN date(?) AND date(?)${sc.own('assigned_to')}
       GROUP BY m ORDER BY m DESC
     `).all(from, to);
     return {
@@ -51,12 +62,12 @@ const REPORTS = {
     };
   },
 
-  lead_source: (q) => {
+  lead_source: (q, sc) => {
     const { from, to } = range(q);
     const rows = db.prepare(`
       SELECT COALESCE(source,'Not set') s, COUNT(*) total,
              SUM(CASE WHEN status = 'Converted' THEN 1 ELSE 0 END) converted
-      FROM leads WHERE date(created_at) BETWEEN date(?) AND date(?)
+      FROM leads WHERE date(created_at) BETWEEN date(?) AND date(?)${sc.own('assigned_to')}
       GROUP BY s ORDER BY total DESC
     `).all(from, to);
     return {
@@ -69,7 +80,7 @@ const REPORTS = {
   },
 
   /* ---- follow-up ---- */
-  followup_pending: () => ({
+  followup_pending: (q, sc) => ({
     title: 'Pending & Overdue Follow-ups',
     columns: ['Due', 'Record', 'Type', 'Note', 'Assigned to', 'State'],
     rows: db.prepare(`
@@ -82,12 +93,12 @@ const REPORTS = {
         END AS name,
         CASE WHEN f.due_at < datetime('now','localtime') THEN 'Overdue' ELSE 'Upcoming' END AS state
       FROM followups f LEFT JOIN users u ON u.id = f.assigned_to
-      WHERE f.status = 'Pending' ORDER BY f.due_at
+      WHERE f.status = 'Pending'${sc.own('f.assigned_to')} ORDER BY f.due_at
     `).all().map((r) => [r.due_at, r.name || '—', r.entity_type, r.note || '—', r.staff || '—', r.state]),
   }),
 
   /* ---- files ---- */
-  active_files: () => ({
+  active_files: (q, sc) => ({
     title: 'Active File Report',
     columns: ['Reference', 'Customer', 'Country', 'Service', 'Status', 'Submitted', 'Staff', 'Partner'],
     rows: db.prepare(`
@@ -98,20 +109,20 @@ const REPORTS = {
       LEFT JOIN customers c ON c.id = f.customer_id
       LEFT JOIN users u ON u.id = f.assigned_to
       LEFT JOIN partners p ON p.id = f.partner_id
-      WHERE f.status IN (${ACTIVE_FILE_STATUSES.map(() => '?').join(',')})
+      WHERE f.status IN (${ACTIVE_FILE_STATUSES.map(() => '?').join(',')})${sc.own('f.assigned_to')}
       ORDER BY f.created_at DESC
     `).all(...ACTIVE_FILE_STATUSES)
       .map((r) => [r.reference_no, r.customer || '—', r.country || '—', r.service_type || '—',
         r.status, r.submission_date || '—', r.staff || '—', r.partner_name || 'Direct']),
   }),
 
-  country_wise: (q) => {
+  country_wise: (q, sc) => {
     const { from, to } = range(q);
     const rows = db.prepare(`
       SELECT COALESCE(country,'Not set') c, COUNT(*) total,
              SUM(CASE WHEN status = 'Approved' THEN 1 ELSE 0 END) approved,
              SUM(CASE WHEN status = 'Rejected' THEN 1 ELSE 0 END) rejected
-      FROM case_files WHERE date(created_at) BETWEEN date(?) AND date(?)
+      FROM case_files WHERE date(created_at) BETWEEN date(?) AND date(?)${sc.own('assigned_to')}
       GROUP BY c ORDER BY total DESC
     `).all(from, to);
     return {
@@ -126,7 +137,7 @@ const REPORTS = {
     };
   },
 
-  approved_vs_rejected: (q) => {
+  approved_vs_rejected: (q, sc) => {
     const { from, to } = range(q);
     const rows = db.prepare(`
       SELECT strftime('%Y-%m', COALESCE(completion_date, updated_at)) m,
@@ -134,7 +145,7 @@ const REPORTS = {
              SUM(CASE WHEN status = 'Rejected' THEN 1 ELSE 0 END) rejected
       FROM case_files
       WHERE status IN ('Approved','Rejected')
-        AND date(COALESCE(completion_date, updated_at)) BETWEEN date(?) AND date(?)
+        AND date(COALESCE(completion_date, updated_at)) BETWEEN date(?) AND date(?)${sc.own('assigned_to')}
       GROUP BY m ORDER BY m DESC
     `).all(from, to);
     return {
@@ -149,7 +160,7 @@ const REPORTS = {
   },
 
   /* ---- partners ---- */
-  partner_wise: () => ({
+  partner_wise: (q, sc) => ({
     title: 'Partner-wise File Report',
     columns: ['Partner', 'Company', 'Files', 'Processing', 'Approved', 'Rejected', 'Billed', 'Due'],
     rows: db.prepare(`
@@ -168,7 +179,7 @@ const REPORTS = {
   }),
 
   /* ---- money ---- */
-  invoice_report: (q) => {
+  invoice_report: (q, sc) => {
     const { from, to } = range(q);
     return {
       title: 'Invoice Report',
@@ -179,7 +190,8 @@ const REPORTS = {
         FROM invoices i
         LEFT JOIN customers c ON c.id = i.customer_id
         LEFT JOIN partners p ON p.id = i.partner_id
-        WHERE date(i.issue_date) BETWEEN date(?) AND date(?)
+        LEFT JOIN case_files f ON f.id = i.case_file_id
+        WHERE date(i.issue_date) BETWEEN date(?) AND date(?)${sc.ownMoney()}
         ORDER BY i.issue_date DESC, i.id DESC
       `).all(from, to).map((r) => [r.invoice_no, r.issue_date, r.billed_to || '—',
         r.total.toFixed(2), r.paid.toFixed(2), (r.total - r.paid).toFixed(2), r.status]),
@@ -187,7 +199,7 @@ const REPORTS = {
     };
   },
 
-  payment_due: () => ({
+  payment_due: (q, sc) => ({
     title: 'Payment Due Report',
     columns: ['Invoice', 'Billed to', 'Issued', 'Due date', 'Total', 'Paid', 'Outstanding', 'Status'],
     rows: db.prepare(`
@@ -196,20 +208,25 @@ const REPORTS = {
       FROM invoices i
       LEFT JOIN customers c ON c.id = i.customer_id
       LEFT JOIN partners p ON p.id = i.partner_id
-      WHERE i.status IN ('Unpaid','Partial Paid')
+      LEFT JOIN case_files f ON f.id = i.case_file_id
+      WHERE i.status IN ('Unpaid','Partial Paid')${sc.ownMoney()}
       ORDER BY COALESCE(i.due_date, i.issue_date)
     `).all().map((r) => [r.invoice_no, r.billed_to || '—', r.issue_date, r.due_date || '—',
       r.total.toFixed(2), r.paid.toFixed(2), (r.total - r.paid).toFixed(2), r.status]),
   }),
 
-  collection: (q) => {
+  collection: (q, sc) => {
     const { from, to } = range(q);
     return {
       title: 'Payment Collection Report',
       columns: ['Date', 'Payments', 'Collected'],
       rows: db.prepare(`
-        SELECT date(paid_at) d, COUNT(*) n, COALESCE(SUM(amount),0) total
-        FROM payments WHERE date(paid_at) BETWEEN date(?) AND date(?)
+        SELECT date(pay.paid_at) d, COUNT(*) n, COALESCE(SUM(pay.amount),0) total
+        FROM payments pay
+        JOIN invoices i ON i.id = pay.invoice_id
+        LEFT JOIN customers c ON c.id = i.customer_id
+        LEFT JOIN case_files f ON f.id = i.case_file_id
+        WHERE date(pay.paid_at) BETWEEN date(?) AND date(?)${sc.ownCollection()}
         GROUP BY d ORDER BY d DESC
       `).all(from, to).map((r) => [r.d, r.n, r.total.toFixed(2)]),
       range: { from, to },
@@ -217,7 +234,7 @@ const REPORTS = {
   },
 
   /* ---- team ---- */
-  staff_performance: (q) => {
+  staff_performance: (q, sc) => {
     const { from, to } = range(q);
     const rows = db.prepare(`
       SELECT u.id, u.name, u.role,
@@ -254,23 +271,52 @@ const REPORTS = {
   },
 };
 
+/** Builds the scope helpers for whoever is asking. */
+function scopeFor(user) {
+  const allWork = seesAllWork(user);
+  const allMoney = seesAllMoney(user);
+  return {
+    own: (column) => (allWork ? '' : ` AND ${column} = ${user.id}`),
+    // A staff member cannot raise invoices, so their sales are the invoices
+    // against the customers and files they handle, not ones they created.
+    ownMoney: () => (allMoney ? '' : ` AND (i.created_by = ${user.id}
+      OR c.assigned_to = ${user.id} OR f.assigned_to = ${user.id})`),
+    ownCollection: () => (allMoney ? '' : ` AND (pay.received_by = ${user.id}
+      OR i.created_by = ${user.id} OR c.assigned_to = ${user.id} OR f.assigned_to = ${user.id})`),
+    allWork,
+    allMoney,
+  };
+}
+
+const availableTo = (user) => Object.keys(REPORTS)
+  .filter((key) => seesAllWork(user) || !PRIVILEGED_REPORTS.includes(key));
+
 router.get('/', wrap((req, res) => {
+  const sc = scopeFor(req.user);
   res.json({
-    data: Object.keys(REPORTS).map((key) => ({ key, title: REPORTS[key]({}).title })),
+    data: availableTo(req.user).map((key) => ({ key, title: REPORTS[key]({}, sc).title })),
+    scoped: !sc.allWork || !sc.allMoney,
   });
 }));
 
 router.get('/:key', wrap((req, res) => {
   const build = REPORTS[req.params.key];
   if (!build) bad(`Unknown report: "${req.params.key}"`);
-  res.json({ data: build(req.query) });
+  if (!availableTo(req.user).includes(req.params.key)) {
+    throw new HttpError(403, 'Your role does not have access to this report');
+  }
+  const sc = scopeFor(req.user);
+  res.json({ data: build(req.query, sc), scoped: !sc.allWork || !sc.allMoney });
 }));
 
 /** CSV export of any report, so figures can be handed to an accountant. */
-router.get('/:key/csv', requireRole('admin', 'manager', 'accounts'), wrap((req, res) => {
+router.get('/:key/csv', wrap((req, res) => {
   const build = REPORTS[req.params.key];
   if (!build) bad(`Unknown report: "${req.params.key}"`);
-  const report = build(req.query);
+  if (!availableTo(req.user).includes(req.params.key)) {
+    throw new HttpError(403, 'Your role does not have access to this report');
+  }
+  const report = build(req.query, scopeFor(req.user));
   const escape = (v) => {
     const s = v === null || v === undefined ? '' : String(v);
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;

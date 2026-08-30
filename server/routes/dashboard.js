@@ -1,7 +1,7 @@
 'use strict';
 const express = require('express');
 const { db } = require('../db');
-const { requireAuth, denyPartner } = require('../auth');
+const { requireAuth, denyPartner, seesAllWork, seesAllMoney } = require('../auth');
 const { wrap } = require('../helpers');
 const { ACTIVE_FILE_STATUSES } = require('../constants');
 
@@ -79,18 +79,27 @@ function partnerDashboard(req, res) {
   });
 }
 
-/** Only these roles may look at company-wide figures. */
-const COMPANY_WIDE_ROLES = ['admin', 'manager'];
-
 router.get('/', wrap((req, res) => {
   if (req.user.role === 'partner') return partnerDashboard(req, res);
 
-  // Everyone else is pinned to their own work; asking for company scope in the
-  // query string does not grant it.
-  const canSeeCompany = COMPANY_WIDE_ROLES.includes(req.user.role);
+  // Work and money are governed separately: only admins and managers see the
+  // company's pipeline, while accounts also sees the company's money because
+  // producing financial summaries is that role's job.
+  const canSeeCompany = seesAllWork(req.user);
   const mine = (!canSeeCompany || req.query.scope === 'mine') ? req.user.id : null;
+  const myMoney = seesAllMoney(req.user) && !(canSeeCompany && mine) ? null : mine;
   const byMe = (column) => (mine ? ` AND ${column} = ${mine}` : '');
   const whereMine = (column) => (mine ? ` WHERE ${column} = ${mine}` : '');
+
+  // Sales are counted the same way the Invoices page counts them: the invoices
+  // against the customers and files this person handles. Scoping by who created
+  // the invoice would read zero for staff, who cannot raise invoices at all.
+  const MONEY_FROM = `FROM invoices i
+    LEFT JOIN customers c ON c.id = i.customer_id
+    LEFT JOIN case_files cf ON cf.id = i.case_file_id`;
+  const mySales = myMoney
+    ? ` AND (i.created_by = ${myMoney} OR c.assigned_to = ${myMoney} OR cf.assigned_to = ${myMoney})`
+    : '';
 
   const fileCounts = Object.fromEntries(
     db.prepare(`SELECT status, COUNT(*) n FROM case_files${whereMine('assigned_to')} GROUP BY status`)
@@ -129,32 +138,34 @@ router.get('/', wrap((req, res) => {
     total_partners: count('SELECT COUNT(*) n FROM partners'),
     active_partners: count("SELECT COUNT(*) n FROM partners WHERE status = 'Active'"),
 
-    total_invoices: count(`SELECT COUNT(*) n FROM invoices WHERE status != 'Cancelled'${byMe('created_by')}`),
-    unpaid_invoices: count(`SELECT COUNT(*) n FROM invoices WHERE status IN ('Unpaid','Partial Paid')${byMe('created_by')}`),
+    total_invoices: count(`SELECT COUNT(*) n ${MONEY_FROM} WHERE i.status != 'Cancelled'${mySales}`),
+    unpaid_invoices: count(`SELECT COUNT(*) n ${MONEY_FROM} WHERE i.status IN ('Unpaid','Partial Paid')${mySales}`),
   };
 
   const money = db.prepare(`
-    SELECT COALESCE(SUM(total),0) billed, COALESCE(SUM(paid),0) collected
-    FROM invoices WHERE status != 'Cancelled'${byMe('created_by')}
+    SELECT COALESCE(SUM(i.total),0) billed, COALESCE(SUM(i.paid),0) collected
+    ${MONEY_FROM} WHERE i.status != 'Cancelled'${mySales}
   `).get();
   stats.total_billed = money.billed;
   stats.total_collected = money.collected;
   stats.pending_payments = Math.round((money.billed - money.collected) * 100) / 100;
 
   const thisMonth = db.prepare(`
-    SELECT COALESCE(SUM(total),0) billed, COALESCE(SUM(paid),0) collected, COUNT(*) invoices
-    FROM invoices
-    WHERE status != 'Cancelled' AND strftime('%Y-%m', issue_date) = strftime('%Y-%m','now','localtime')${byMe('created_by')}
+    SELECT COALESCE(SUM(i.total),0) billed, COALESCE(SUM(i.paid),0) collected, COUNT(*) invoices
+    ${MONEY_FROM}
+    WHERE i.status != 'Cancelled'
+      AND strftime('%Y-%m', i.issue_date) = strftime('%Y-%m','now','localtime')${mySales}
   `).get();
   stats.month_billed = thisMonth.billed;
   stats.month_collected = thisMonth.collected;
   stats.month_invoices = thisMonth.invoices;
 
   const monthlySales = db.prepare(`
-    SELECT strftime('%Y-%m', issue_date) AS month,
-           COALESCE(SUM(total),0) billed, COALESCE(SUM(paid),0) collected, COUNT(*) invoices
-    FROM invoices
-    WHERE status != 'Cancelled' AND issue_date >= date('now','localtime','-11 months','start of month')${byMe('created_by')}
+    SELECT strftime('%Y-%m', i.issue_date) AS month,
+           COALESCE(SUM(i.total),0) billed, COALESCE(SUM(i.paid),0) collected, COUNT(*) invoices
+    ${MONEY_FROM}
+    WHERE i.status != 'Cancelled'
+      AND i.issue_date >= date('now','localtime','-11 months','start of month')${mySales}
     GROUP BY month ORDER BY month
   `).all();
 

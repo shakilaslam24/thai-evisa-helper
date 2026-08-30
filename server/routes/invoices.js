@@ -1,7 +1,7 @@
 'use strict';
 const express = require('express');
 const { db } = require('../db');
-const { requireAuth, canWrite } = require('../auth');
+const { requireAuth, canWrite, seesAllMoney } = require('../auth');
 const {
   wrap, bad, notFound, paging, orderBy, conditions, logActivity, toNumber,
   clean, todayISO, HttpError,
@@ -94,6 +94,13 @@ router.get('/', wrap((req, res) => {
   const q = req.query;
   const w = conditions();
   if (req.user.role === 'partner') w.add('i.partner_id = ?', req.user.partner_id || -1);
+  // A staff member's sales are the invoices against the customers and files
+  // they handle — they cannot raise invoices themselves, so scoping by who
+  // created the invoice would show them nothing at all.
+  else if (!seesAllMoney(req.user)) {
+    w.add('(i.created_by = ? OR c.assigned_to = ? OR f.assigned_to = ?)',
+      req.user.id, req.user.id, req.user.id);
+  }
   if (q.search) {
     const like = `%${q.search}%`;
     w.add('(i.invoice_no LIKE ? OR c.given_name LIKE ? OR c.surname LIKE ? OR p.partner_name LIKE ?)',
@@ -111,7 +118,8 @@ router.get('/', wrap((req, res) => {
   const total = db.prepare(`
     SELECT COUNT(*) n FROM invoices i
     LEFT JOIN customers c ON c.id = i.customer_id
-    LEFT JOIN partners p ON p.id = i.partner_id ${w.where()}
+    LEFT JOIN partners p ON p.id = i.partner_id
+    LEFT JOIN case_files f ON f.id = i.case_file_id ${w.where()}
   `).get(...w.params).n;
   const data = db.prepare(`${SELECT} ${w.where()} ORDER BY ${sort}, i.id DESC LIMIT ? OFFSET ?`)
     .all(...w.params, limit, offset);
@@ -120,7 +128,8 @@ router.get('/', wrap((req, res) => {
     SELECT COALESCE(SUM(i.total),0) billed, COALESCE(SUM(i.paid),0) collected
     FROM invoices i
     LEFT JOIN customers c ON c.id = i.customer_id
-    LEFT JOIN partners p ON p.id = i.partner_id ${w.where()}
+    LEFT JOIN partners p ON p.id = i.partner_id
+    LEFT JOIN case_files f ON f.id = i.case_file_id ${w.where()}
   `).get(...w.params);
 
   res.json({ data, total, page, limit, totals: { ...totals, due: totals.billed - totals.collected } });
@@ -134,6 +143,15 @@ router.get('/:id', wrap((req, res) => {
   const invoice = db.prepare(`${SELECT} WHERE i.id = ?`).get(Number(req.params.id));
   if (!invoice) notFound('Invoice not found');
   guardPartnerScope(req, invoice);
+  if (!seesAllMoney(req.user)) {
+    const ownsIt = invoice.created_by === req.user.id
+      || db.prepare(`SELECT 1 FROM invoices i
+           LEFT JOIN customers c ON c.id = i.customer_id
+           LEFT JOIN case_files f ON f.id = i.case_file_id
+           WHERE i.id = ? AND (c.assigned_to = ? OR f.assigned_to = ?)`)
+        .get(invoice.id, req.user.id, req.user.id);
+    if (!ownsIt) throw new HttpError(403, 'You can only open invoices for your own customers and files');
+  }
   const items = db.prepare('SELECT * FROM invoice_items WHERE invoice_id = ? ORDER BY id').all(invoice.id);
   const payments = db.prepare(`
     SELECT pay.*, u.name AS received_by_name FROM payments pay

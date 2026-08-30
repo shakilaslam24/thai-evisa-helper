@@ -94,8 +94,8 @@ inside the app under **Settings**.
 | --- | --- |
 | **Admin** | Everything, including users and settings. Only an admin can delete a case file, an uploaded document or a customer. |
 | **Manager** | Leads, customers, partners, files, follow-up, meetings, documents, invoices, payments and reports. |
-| **Staff / Executive** | Leads, follow-up, meetings, customers, files, documents and notes. Their dashboard shows only their own work — company-wide figures are limited to admins and managers. |
-| **Accounts / Finance** | Invoices, payments, due reports and financial summaries. Read access elsewhere; their dashboard is scoped to their own work. |
+| **Staff / Executive** | Leads, follow-up, meetings, customers, files, documents and notes. Their dashboard, invoices, payments and reports show only their own work and their own sales — the company's figures are limited to admins and managers. |
+| **Accounts / Finance** | Invoices, payments, due reports and financial summaries. Sees the company's money everywhere, since producing financial summaries is the role's job, but not the company-wide sales pipeline. |
 | **B2B Partner** | Limited login that only ever sees the files and invoices under its own partner account. |
 
 ---
