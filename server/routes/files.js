@@ -2,7 +2,7 @@
 const express = require('express');
 const { db } = require('../db');
 const vocab = require('../vocab');
-const { requireAuth, canWrite } = require('../auth');
+const { requireAuth, canWrite, requireRole } = require('../auth');
 const {
   wrap, bad, notFound, pick, requireFields, oneOf, paging, orderBy, conditions,
   logActivity, notify, diffSummary, HttpError,
@@ -287,7 +287,9 @@ router.patch('/:id/status', canWrite('files'), wrap((req, res) => {
   res.json({ data: db.prepare(`${SELECT} WHERE f.id = ?`).get(id) });
 }));
 
-router.delete('/:id', canWrite('files'), wrap((req, res) => {
+// Deleting a file destroys its checklist, documents and history, so only an
+// administrator may do it.
+router.delete('/:id', requireRole('admin'), wrap((req, res) => {
   const file = db.prepare('SELECT * FROM case_files WHERE id = ?').get(Number(req.params.id));
   if (!file) notFound('File not found');
   db.prepare('DELETE FROM case_files WHERE id = ?').run(file.id);

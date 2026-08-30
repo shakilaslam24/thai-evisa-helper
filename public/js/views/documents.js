@@ -1,6 +1,6 @@
 import { el, card, table, fmtDateTime, badge, toast, toastError, confirmDialog, clear } from '../ui.js';
 import { api, qs } from '../api.js';
-import { store, can, listValues } from '../store.js';
+import { store, can, canDelete, listValues } from '../store.js';
 import { pageHead, staffOptions } from './common.js';
 import { navigate, parseHash } from '../router.js';
 
@@ -62,7 +62,7 @@ export default function documentsView() {
             render: (d) => el('div', { class: 'row-actions' }, [
               el('a', { class: 'btn btn--sm', href: `/api/documents/${d.id}/download?inline=1`, target: '_blank', text: 'View' }),
               el('a', { class: 'btn btn--sm', href: `/api/documents/${d.id}/download`, text: 'Download' }),
-              can('documents') ? el('button', {
+              canDelete() ? el('button', {
                 class: 'btn btn--sm btn--danger', text: 'Delete',
                 onClick: async () => {
                   if (!await confirmDialog(`Delete "${d.original_name}"?`)) return;

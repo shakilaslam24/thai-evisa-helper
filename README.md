@@ -92,10 +92,10 @@ inside the app under **Settings**.
 
 | Role | Access |
 | --- | --- |
-| **Admin** | Everything, including users and settings. |
+| **Admin** | Everything, including users and settings. Only an admin can delete a case file, an uploaded document or a customer. |
 | **Manager** | Leads, customers, partners, files, follow-up, meetings, documents, invoices, payments and reports. |
-| **Staff / Executive** | Leads, follow-up, meetings, customers, files, documents and notes. |
-| **Accounts / Finance** | Invoices, payments, due reports and financial summaries. Read access elsewhere. |
+| **Staff / Executive** | Leads, follow-up, meetings, customers, files, documents and notes. Their dashboard shows only their own work — company-wide figures are limited to admins and managers. |
+| **Accounts / Finance** | Invoices, payments, due reports and financial summaries. Read access elsewhere; their dashboard is scoped to their own work. |
 | **B2B Partner** | Limited login that only ever sees the files and invoices under its own partner account. |
 
 ---

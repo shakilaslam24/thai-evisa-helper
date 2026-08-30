@@ -1,6 +1,6 @@
 import { el, table, pagination, card, toastError, field, clear } from '../ui.js';
 import { api, qs } from '../api.js';
-import { store, staffUsers, listValues } from '../store.js';
+import { store, staffUsers, listValues, canDelete } from '../store.js';
 import { navigate, parseHash } from '../router.js';
 
 export function pageHead(title, subtitle, actions = []) {
@@ -181,7 +181,7 @@ export function documentsPanel(entityType, entityId, documents, { canEdit, onCha
         ]),
         el('a', { class: 'btn btn--sm', href: `/api/documents/${doc.id}/download?inline=1`, target: '_blank', text: 'View' }),
         el('a', { class: 'btn btn--sm', href: `/api/documents/${doc.id}/download`, text: 'Download' }),
-        canEdit ? el('button', {
+        canDelete() ? el('button', {
           class: 'btn btn--sm btn--danger', text: 'Delete',
           onClick: async () => {
             const { confirmDialog, toast } = await import('../ui.js');

@@ -72,3 +72,6 @@ export function can(module) {
 }
 
 export const isPartnerLogin = () => store.user?.role === 'partner';
+
+/** Deleting a file, document or customer is reserved for administrators. */
+export const canDelete = () => store.user?.role === 'admin';

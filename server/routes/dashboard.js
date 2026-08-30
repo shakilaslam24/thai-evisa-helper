@@ -79,15 +79,22 @@ function partnerDashboard(req, res) {
   });
 }
 
+/** Only these roles may look at company-wide figures. */
+const COMPANY_WIDE_ROLES = ['admin', 'manager'];
+
 router.get('/', wrap((req, res) => {
-  const mine = req.query.scope === 'mine' ? req.user.id : null;
   if (req.user.role === 'partner') return partnerDashboard(req, res);
-  // "My" scope narrows every staff-owned metric to the signed-in user.
+
+  // Everyone else is pinned to their own work; asking for company scope in the
+  // query string does not grant it.
+  const canSeeCompany = COMPANY_WIDE_ROLES.includes(req.user.role);
+  const mine = (!canSeeCompany || req.query.scope === 'mine') ? req.user.id : null;
   const byMe = (column) => (mine ? ` AND ${column} = ${mine}` : '');
+  const whereMine = (column) => (mine ? ` WHERE ${column} = ${mine}` : '');
 
   const fileCounts = Object.fromEntries(
-    db.prepare('SELECT status, COUNT(*) n FROM case_files GROUP BY status').all()
-      .map((r) => [r.status, r.n])
+    db.prepare(`SELECT status, COUNT(*) n FROM case_files${whereMine('assigned_to')} GROUP BY status`)
+      .all().map((r) => [r.status, r.n])
   );
 
   const stats = {
@@ -106,10 +113,11 @@ router.get('/', wrap((req, res) => {
     meetings_upcoming: count(`SELECT COUNT(*) n FROM meetings
       WHERE meeting_at > datetime('now','localtime') AND status = 'Scheduled'${byMe('assigned_to')}`),
 
-    total_customers: count('SELECT COUNT(*) n FROM customers'),
-    total_files: count('SELECT COUNT(*) n FROM case_files'),
+    total_customers: count(`SELECT COUNT(*) n FROM customers WHERE 1=1${byMe('assigned_to')}`),
+    total_files: count(`SELECT COUNT(*) n FROM case_files WHERE 1=1${byMe('assigned_to')}`),
     active_files: count(
-      `SELECT COUNT(*) n FROM case_files WHERE status IN (${ACTIVE_PLACEHOLDERS})`, ...ACTIVE_FILE_STATUSES),
+      `SELECT COUNT(*) n FROM case_files WHERE status IN (${ACTIVE_PLACEHOLDERS})${byMe('assigned_to')}`,
+      ...ACTIVE_FILE_STATUSES),
     files_processing: fileCounts['Under Processing'] || 0,
     files_completed: (fileCounts.Completed || 0) + (fileCounts.Delivered || 0),
     files_interview_pending: fileCounts['Interview Called'] || 0,
@@ -121,13 +129,13 @@ router.get('/', wrap((req, res) => {
     total_partners: count('SELECT COUNT(*) n FROM partners'),
     active_partners: count("SELECT COUNT(*) n FROM partners WHERE status = 'Active'"),
 
-    total_invoices: count("SELECT COUNT(*) n FROM invoices WHERE status != 'Cancelled'"),
-    unpaid_invoices: count("SELECT COUNT(*) n FROM invoices WHERE status IN ('Unpaid','Partial Paid')"),
+    total_invoices: count(`SELECT COUNT(*) n FROM invoices WHERE status != 'Cancelled'${byMe('created_by')}`),
+    unpaid_invoices: count(`SELECT COUNT(*) n FROM invoices WHERE status IN ('Unpaid','Partial Paid')${byMe('created_by')}`),
   };
 
   const money = db.prepare(`
     SELECT COALESCE(SUM(total),0) billed, COALESCE(SUM(paid),0) collected
-    FROM invoices WHERE status != 'Cancelled'
+    FROM invoices WHERE status != 'Cancelled'${byMe('created_by')}
   `).get();
   stats.total_billed = money.billed;
   stats.total_collected = money.collected;
@@ -136,7 +144,7 @@ router.get('/', wrap((req, res) => {
   const thisMonth = db.prepare(`
     SELECT COALESCE(SUM(total),0) billed, COALESCE(SUM(paid),0) collected, COUNT(*) invoices
     FROM invoices
-    WHERE status != 'Cancelled' AND strftime('%Y-%m', issue_date) = strftime('%Y-%m','now','localtime')
+    WHERE status != 'Cancelled' AND strftime('%Y-%m', issue_date) = strftime('%Y-%m','now','localtime')${byMe('created_by')}
   `).get();
   stats.month_billed = thisMonth.billed;
   stats.month_collected = thisMonth.collected;
@@ -146,7 +154,7 @@ router.get('/', wrap((req, res) => {
     SELECT strftime('%Y-%m', issue_date) AS month,
            COALESCE(SUM(total),0) billed, COALESCE(SUM(paid),0) collected, COUNT(*) invoices
     FROM invoices
-    WHERE status != 'Cancelled' AND issue_date >= date('now','localtime','-11 months','start of month')
+    WHERE status != 'Cancelled' AND issue_date >= date('now','localtime','-11 months','start of month')${byMe('created_by')}
     GROUP BY month ORDER BY month
   `).all();
 
@@ -154,7 +162,7 @@ router.get('/', wrap((req, res) => {
     SELECT strftime('%Y-%m', created_at) AS month, COUNT(*) leads,
            SUM(CASE WHEN status = 'Converted' THEN 1 ELSE 0 END) converted
     FROM leads
-    WHERE created_at >= date('now','localtime','-11 months','start of month')
+    WHERE created_at >= date('now','localtime','-11 months','start of month')${byMe('assigned_to')}
     GROUP BY month ORDER BY month
   `).all();
 
@@ -190,11 +198,12 @@ router.get('/', wrap((req, res) => {
   const recentActivity = db.prepare(`
     SELECT a.*, u.name AS user_name FROM activities a
     LEFT JOIN users u ON u.id = a.user_id
+    ${mine ? `WHERE a.user_id = ${mine}` : ''}
     ORDER BY a.id DESC LIMIT 8
   `).all();
 
   const filesByStatus = db.prepare(
-    'SELECT status, COUNT(*) n FROM case_files GROUP BY status ORDER BY n DESC'
+    `SELECT status, COUNT(*) n FROM case_files${whereMine('assigned_to')} GROUP BY status ORDER BY n DESC`
   ).all();
 
   const upcomingInterviews = db.prepare(`
@@ -202,11 +211,12 @@ router.get('/', wrap((req, res) => {
            trim(c.given_name || ' ' || COALESCE(c.surname,'')) AS customer_name
     FROM case_files f LEFT JOIN customers c ON c.id = f.customer_id
     WHERE f.interview_date IS NOT NULL AND date(f.interview_date) >= date('now','localtime')
-      AND f.status NOT IN ('Approved','Rejected','Delivered','Completed')
+      AND f.status NOT IN ('Approved','Rejected','Delivered','Completed')${byMe('f.assigned_to')}
     ORDER BY f.interview_date LIMIT 8
   `).all();
 
   res.json({
+    canSeeCompany, scope: mine ? 'mine' : 'all',
     stats, monthlySales, leadTrend, todayFollowups, todayMeetings,
     recentActivity, filesByStatus, upcomingInterviews,
   });

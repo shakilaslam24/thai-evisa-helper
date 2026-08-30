@@ -3,7 +3,7 @@ import {
   formModal, confirmDialog, clear,
 } from '../ui.js';
 import { api, qs } from '../api.js';
-import { store, can, listValues } from '../store.js';
+import { store, can, canDelete, listValues } from '../store.js';
 import { navigate } from '../router.js';
 import {
   listPage, staffOptions, partnerOptions, countryOptions, serviceOptions,
@@ -213,7 +213,7 @@ export async function fileDetailView({ id }) {
   return el('div', { class: 'stack' }, [
     el('div', { class: 'flex' }, [
       el('a', { class: 'btn btn--sm btn--ghost', href: '#/files', text: '← All files' }),
-      editable ? el('button', {
+      canDelete() ? el('button', {
         class: 'btn btn--sm btn--ghost', text: 'Delete file',
         onClick: async () => {
           if (!await confirmDialog(`Delete file ${f.reference_no}? This cannot be undone.`)) return;

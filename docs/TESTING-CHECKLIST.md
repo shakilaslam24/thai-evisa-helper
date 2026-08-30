@@ -115,6 +115,8 @@ npm start
 - [ ] B2B partners, Invoices, Pending payments, Monthly sales দেখাচ্ছে
 - [ ] যেকোনো সংখ্যায় ক্লিক করলে সেই ফিল্টার করা লিস্ট খোলে
 - [ ] **Whole company** ↔ **My work** বাটন সংখ্যা বদলায়
+- [ ] **স্টাফ ও অ্যাকাউন্টস দিয়ে লগইন করে দেখুন — "Whole company" বাটনই নেই**,
+      আর সংখ্যাগুলো শুধু তাদের নিজের কাজের
 
 ### ২.৩ Lead Management (§3)
 
@@ -334,6 +336,13 @@ Sign out করে অন্য রোলে লগইন করুন:
 **Accounts (`accounts@dreamfly.local` / `demo-accts-2026`):**
 - [ ] Invoice ও Payment তৈরি করতে পারে
 - [ ] Lead তৈরি করতে পারে না
+
+**ডিলিটের সুরক্ষা — শুধু অ্যাডমিন:**
+- [ ] স্টাফ বা ম্যানেজার দিয়ে লগইন করে file খুলুন → **Delete file বাটন নেই**
+- [ ] customer প্রোফাইলে → **Delete customer বাটন নেই**
+- [ ] Documents পেজে → **Delete বাটন নেই**
+- [ ] অ্যাডমিন দিয়ে লগইন করলে তিনটাই আছে
+- [ ] স্টাফ এখনো ডকুমেন্ট **আপলোড** করতে পারে (শুধু মুছতে পারে না)
 
 **B2B Partner login** (Settings → Users → নতুন ইউজার, Role = "B2B Partner",
 একটা partner বেছে দিন):

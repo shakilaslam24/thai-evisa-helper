@@ -1,7 +1,7 @@
 'use strict';
 const express = require('express');
 const { db } = require('../db');
-const { requireAuth, canWrite } = require('../auth');
+const { requireAuth, canWrite, requireRole } = require('../auth');
 const {
   wrap, notFound, pick, requireFields, paging, orderBy, conditions,
   logActivity, diffSummary, HttpError,
@@ -137,7 +137,9 @@ router.put('/:id', canWrite('customers'), wrap((req, res) => {
   res.json({ data: db.prepare(`${SELECT} WHERE c.id = ?`).get(id) });
 }));
 
-router.delete('/:id', canWrite('customers'), wrap((req, res) => {
+// customers -> case_files is ON DELETE CASCADE, so allowing this to anyone
+// below admin would be a way around the file deletion rule.
+router.delete('/:id', requireRole('admin'), wrap((req, res) => {
   const customer = db.prepare('SELECT * FROM customers WHERE id = ?').get(Number(req.params.id));
   if (!customer) notFound('Customer not found');
   db.prepare('DELETE FROM customers WHERE id = ?').run(customer.id);

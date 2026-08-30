@@ -1,6 +1,6 @@
 import { el, card, statCard, badge, fmtDateTime, fmtDate, money, barChart, timeline, monthLabel } from '../ui.js';
 import { api } from '../api.js';
-import { store, isPartnerLogin } from '../store.js';
+import { store } from '../store.js';
 import { pageHead } from './common.js';
 import { navigate, parseHash } from '../router.js';
 
@@ -10,7 +10,8 @@ export default async function dashboardView() {
   const s = res.stats;
   const currency = store.settings.invoice_currency || 'BDT';
 
-  const scopeToggle = el('div', { class: 'flex' }, [
+  // The toggle only appears for roles the server actually grants company scope.
+  const scopeToggle = res.canSeeCompany ? el('div', { class: 'flex' }, [
     el('button', {
       class: `btn btn--sm${scope === 'all' ? ' btn--primary' : ''}`, text: 'Whole company',
       onClick: () => navigate('/dashboard'),
@@ -19,7 +20,7 @@ export default async function dashboardView() {
       class: `btn btn--sm${scope === 'mine' ? ' btn--primary' : ''}`, text: 'My work',
       onClick: () => navigate('/dashboard?scope=mine'),
     }),
-  ]);
+  ]) : null;
 
   const pipelineStats = [
     { label: 'Total leads', value: s.total_leads, meta: `${s.leads_today} added today`, link: '#/leads' },
@@ -118,7 +119,7 @@ export default async function dashboardView() {
   return el('div', { class: 'stack' }, [
     pageHead(`${greeting}, ${store.user.name.split(' ')[0]}`,
       `${store.settings.company_name || 'DreamFly Consultancy'} · ${new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}`,
-      [isPartnerLogin() ? null : scopeToggle]),
+      [scopeToggle]),
 
     el('div', { class: 'grid grid--stats' }, pipelineStats.map(statCard)),
 

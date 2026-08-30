@@ -3,7 +3,7 @@ import {
   formModal, confirmDialog, initials,
 } from '../ui.js';
 import { api, qs } from '../api.js';
-import { store, can } from '../store.js';
+import { store, can, canDelete } from '../store.js';
 import { navigate } from '../router.js';
 import {
   listPage, staffOptions, partnerOptions, countryOptions, serviceOptions,
@@ -177,7 +177,7 @@ export async function customerDetailView({ id }) {
   return el('div', { class: 'stack' }, [
     el('div', { class: 'flex' }, [
       el('a', { class: 'btn btn--sm btn--ghost', href: '#/customers', text: '← All customers' }),
-      editable ? el('button', {
+      canDelete() ? el('button', {
         class: 'btn btn--sm btn--ghost', text: 'Delete customer',
         onClick: async () => {
           if (!await confirmDialog(`Delete ${c.full_name}? Their files and documents go with them.`)) return;

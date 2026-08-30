@@ -5,7 +5,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const multer = require('multer');
 const { db, UPLOAD_DIR } = require('../db');
-const { requireAuth, canWrite } = require('../auth');
+const { requireAuth, canWrite, requireRole } = require('../auth');
 const { wrap, bad, notFound, logActivity, HttpError } = require('../helpers');
 
 const router = express.Router();
@@ -181,7 +181,7 @@ router.get('/:id/download', wrap((req, res) => {
   fs.createReadStream(filePath).pipe(res);
 }));
 
-router.delete('/:id', canWrite('documents'), wrap((req, res) => {
+router.delete('/:id', requireRole('admin'), wrap((req, res) => {
   const doc = db.prepare('SELECT * FROM documents WHERE id = ?').get(Number(req.params.id));
   if (!doc) notFound('Document not found');
   db.prepare('DELETE FROM documents WHERE id = ?').run(doc.id);
