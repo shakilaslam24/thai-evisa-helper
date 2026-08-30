@@ -5,7 +5,7 @@ import {
 import { api, qs } from '../api.js';
 import { store, can } from '../store.js';
 import { navigate } from '../router.js';
-import { listPage, partnerOptions } from './common.js';
+import { listPage, partnerOptions, customerPicker } from './common.js';
 
 /* ------------------------------ invoice form ------------------------------ */
 
@@ -72,19 +72,94 @@ export function invoiceForm(invoice, onDone, { customer, partner, file } = {}) {
   ((invoice?.items?.length ? invoice.items : [{}])).forEach(addLine);
   [discountInput, taxInput].forEach((i) => i.addEventListener('input', recalcTotals));
 
-  const billTo = customer || invoice?.customer_id
-    ? { type: 'customer', id: customer?.id ?? invoice?.customer_id, label: customer?.full_name ?? invoice?.customer_name }
+  /* ------------------------------- bill to -------------------------------
+   * Opened from a customer, partner or file profile, the other party is
+   * already known and is simply stated. Opened from the Invoices page there is
+   * no context, so both a customer search and a partner list are offered.
+   */
+  const known = customer || invoice?.customer_id || file?.customer_id
+    ? {
+      type: 'customer',
+      id: customer?.id ?? invoice?.customer_id ?? file?.customer_id,
+      label: customer?.full_name ?? invoice?.customer_name ?? file?.customer_name,
+    }
     : partner || invoice?.partner_id
-      ? { type: 'partner', id: partner?.id ?? invoice?.partner_id, label: partner?.partner_name ?? invoice?.partner_name }
-      : file?.customer_id
-        ? { type: 'customer', id: file.customer_id, label: file.customer_name }
-        : null;
+      ? {
+        type: 'partner',
+        id: partner?.id ?? invoice?.partner_id,
+        label: partner?.partner_name ?? invoice?.partner_name,
+      }
+      : null;
+
+  // Case file to attach, so payments roll up to the file's payment status.
+  let chosenFileId = file?.id ?? invoice?.case_file_id ?? null;
+  const fileSelect = el('select', { name: 'case_file_id' },
+    [el('option', { value: '', text: '— not linked to a file —' })]);
+  const fileField = el('div', { class: 'field span-2', hidden: true }, [
+    el('label', { text: 'Link to a file (optional)' }),
+    fileSelect,
+    el('div', { class: 'field__hint', text: 'Linking keeps the file’s payment status in step with this invoice' }),
+  ]);
+  fileSelect.addEventListener('change', () => { chosenFileId = fileSelect.value || null; });
+
+  /** Offer that customer's files once one is chosen. */
+  async function loadFilesFor(customerId) {
+    fileField.hidden = true;
+    if (!customerId) return;
+    try {
+      const res = await api.get(`/api/files${qs({ limit: 50 })}`);
+      const mine = res.data.filter((f) => String(f.customer_id) === String(customerId));
+      if (!mine.length) return;
+      clear(fileSelect).append(el('option', { value: '', text: '— not linked to a file —' }));
+      for (const f of mine) {
+        fileSelect.append(el('option', {
+          value: f.id,
+          text: `${f.reference_no || `File #${f.id}`} · ${f.service_type || ''} ${f.country || ''}`.trim(),
+          selected: String(f.id) === String(chosenFileId),
+        }));
+      }
+      fileField.hidden = false;
+    } catch { /* the link is optional; a failure must not block invoicing */ }
+  }
+
+  const picker = customerPicker({
+    label: 'Bill to customer', required: true,
+    onSelect: (c) => { chosenFileId = null; loadFilesFor(c?.id); },
+  });
 
   const partnerSelect = field({
     name: 'partner_id', label: 'Bill to B2B partner', type: 'select',
-    options: partnerOptions(), value: billTo?.type === 'partner' ? billTo.id : '',
-    blank: '— none (direct customer) —',
+    options: partnerOptions(), value: known?.type === 'partner' ? known.id : '',
+    blank: '— choose a partner —',
   });
+
+  // Switch between the two, defaulting to a direct customer.
+  let billToType = known?.type || 'customer';
+  const customerPane = el('div', {}, [picker, fileField]);
+  const partnerPane = el('div', { hidden: true }, partnerSelect);
+
+  const showPane = () => {
+    customerPane.hidden = billToType !== 'customer';
+    partnerPane.hidden = billToType !== 'partner';
+    for (const b of tabs.children) b.classList.toggle('btn--primary', b.dataset.type === billToType);
+  };
+  const tabs = el('div', { class: 'flex', style: 'margin-bottom:10px' }, [
+    ['customer', 'Direct customer'], ['partner', 'B2B partner'],
+  ].map(([type, label]) => el('button', {
+    class: 'btn btn--sm', type: 'button', dataset: { type }, text: label,
+    onClick: () => { billToType = type; showPane(); },
+  })));
+
+  const billToBlock = known
+    ? el('div', { class: 'field span-2' }, [
+      el('label', { text: known.type === 'partner' ? 'Bill to B2B partner' : 'Bill to customer' }),
+      el('div', { style: 'font-weight:650', text: known.label || `#${known.id}` }),
+    ])
+    : el('fieldset', { class: 'section' }, [
+      el('legend', { text: 'Bill to' }), tabs, customerPane, partnerPane,
+    ]);
+  if (!known) showPane();
+  if (known?.type === 'customer') loadFilesFor(known.id);
 
   const extra = el('div', { class: 'stack' }, [
     el('fieldset', { class: 'section' }, [
@@ -110,16 +185,13 @@ export function invoiceForm(invoice, onDone, { customer, partner, file } = {}) {
     title: editing ? `Edit invoice ${invoice.invoice_no}` : 'Create invoice',
     wide: true,
     fields: [
-      billTo?.type === 'customer'
-        ? el('p', { class: 'muted mt-0' }, [`Billing customer: `, el('strong', { text: billTo.label || `#${billTo.id}` })])
-        : null,
+      billToBlock,
       { legend: 'Invoice', fields: [
         { name: 'issue_date', label: 'Invoice date', type: 'date', required: true,
           value: invoice?.issue_date || new Date().toISOString().slice(0, 10) },
         { name: 'due_date', label: 'Payment due date', type: 'date', value: invoice?.due_date },
         { name: 'currency', label: 'Currency', value: invoice?.currency || store.settings.invoice_currency || 'BDT' },
       ] },
-      billTo?.type === 'customer' ? null : partnerSelect,
       { name: 'notes', label: 'Notes shown on the invoice', type: 'textarea', value: invoice?.notes },
     ].filter(Boolean),
     extra,
@@ -127,15 +199,19 @@ export function invoiceForm(invoice, onDone, { customer, partner, file } = {}) {
     onSubmit: async (values) => {
       const items = readItems();
       if (!items.length) throw new Error('Add at least one line item');
+      const asCustomer = known ? known.type === 'customer' : billToType === 'customer';
       const payload = {
         ...values,
         items,
-        customer_id: billTo?.type === 'customer' ? billTo.id : null,
-        partner_id: billTo?.type === 'customer' ? null : (values.partner_id || null),
-        case_file_id: file?.id ?? invoice?.case_file_id ?? null,
+        customer_id: asCustomer ? (known?.id ?? (values.customer_id || null)) : null,
+        partner_id: asCustomer ? null : (known?.id ?? (values.partner_id || null)),
+        case_file_id: asCustomer ? (chosenFileId || null) : null,
       };
-      if (!payload.customer_id && !payload.partner_id) {
-        throw new Error('Choose a customer or a B2B partner to bill');
+      if (asCustomer && !payload.customer_id) {
+        throw new Error('Search for and choose the customer to bill');
+      }
+      if (!asCustomer && !payload.partner_id) {
+        throw new Error('Choose the B2B partner to bill');
       }
       const res = editing
         ? await api.put(`/api/invoices/${invoice.id}`, payload)

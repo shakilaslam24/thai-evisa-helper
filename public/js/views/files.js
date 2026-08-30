@@ -7,60 +7,14 @@ import { store, can, listValues } from '../store.js';
 import { navigate } from '../router.js';
 import {
   listPage, staffOptions, partnerOptions, countryOptions, serviceOptions,
-  activityPanel, documentsPanel,
+  activityPanel, documentsPanel, customerPicker,
 } from './common.js';
 import { followupForm } from './leads.js';
 import { invoiceForm } from './invoices.js';
 
-/** Customer picker that searches the API as you type. */
-function customerPicker(selected) {
-  const hidden = el('input', { type: 'hidden', name: 'customer_id', value: selected?.id ?? '' });
-  const search = el('input', {
-    type: 'search', placeholder: 'Type a name or passport number…',
-    value: selected ? `${selected.given_name} ${selected.surname || ''}`.trim() : '',
-  });
-  const results = el('div', { class: 'search__results', hidden: true });
-  let timer;
-  search.addEventListener('input', () => {
-    hidden.value = '';
-    clearTimeout(timer);
-    const term = search.value.trim();
-    if (term.length < 2) { results.hidden = true; return; }
-    timer = setTimeout(async () => {
-      try {
-        const res = await api.get(`/api/customers${qs({ search: term, limit: 8 })}`);
-        clear(results);
-        if (!res.data.length) results.append(el('div', { class: 'search__empty', text: 'No customer found' }));
-        for (const c of res.data) {
-          results.append(el('button', {
-            type: 'button', class: 'search__item', style: 'width:100%;text-align:left;border:0;background:none;cursor:pointer',
-            onClick: () => {
-              hidden.value = c.id;
-              search.value = c.full_name;
-              results.hidden = true;
-            },
-          }, [
-            el('div', { class: 'cell-title', text: c.full_name }),
-            el('div', { class: 'cell-sub', text: `${c.passport_no || 'No passport'} · ${c.phone || ''}` }),
-          ]));
-        }
-        results.hidden = false;
-      } catch { results.hidden = true; }
-    }, 250);
-  });
-  return el('div', { class: 'field span-2' }, [
-    el('label', { text: 'Customer *' }),
-    el('div', { class: 'search', style: 'max-width:none' }, [search, results]),
-    hidden,
-    el('div', { class: 'field__hint', text: 'Search an existing customer. Create the customer first if they are new.' }),
-  ]);
-}
-
 export function fileForm(file, onDone, { customer, partner } = {}) {
   const editing = Boolean(file?.id);
-  const picker = editing || customer
-    ? null
-    : customerPicker(null);
+  const picker = editing || customer ? null : customerPicker({ required: true });
 
   formModal({
     title: editing ? `Edit file — ${file.reference_no}` : 'Open new file',

@@ -237,3 +237,72 @@ export function documentsPanel(entityType, entityId, documents, { canEdit, onCha
     host,
   ]);
 }
+
+/**
+ * Type-ahead customer chooser. Keeps the chosen id in a hidden input so it
+ * submits with the form, and reports the full record through onSelect for
+ * callers that need more than the id.
+ */
+export function customerPicker({
+  name = 'customer_id', label = 'Customer', required = false,
+  selected = null, hint = 'Search by name or passport number', onSelect,
+} = {}) {
+  const hidden = el('input', { type: 'hidden', name, value: selected?.id ?? '' });
+  const search = el('input', {
+    type: 'search', autocomplete: 'off',
+    placeholder: 'Type a name or passport number…',
+    value: selected ? (selected.full_name || `${selected.given_name} ${selected.surname || ''}`.trim()) : '',
+  });
+  const results = el('div', { class: 'search__results', hidden: true });
+  const hintNode = el('div', { class: 'field__hint', text: hint });
+
+  const choose = (customer) => {
+    hidden.value = customer.id;
+    search.value = customer.full_name;
+    results.hidden = true;
+    hintNode.textContent = [customer.passport_no, customer.phone].filter(Boolean).join(' · ')
+      || 'No passport or phone on file';
+    onSelect?.(customer);
+  };
+
+  let timer;
+  search.addEventListener('input', () => {
+    // Typing again clears the previous choice, so a stale id cannot be submitted.
+    hidden.value = '';
+    hintNode.textContent = hint;
+    onSelect?.(null);
+    clearTimeout(timer);
+    const term = search.value.trim();
+    if (term.length < 2) { results.hidden = true; return; }
+    timer = setTimeout(async () => {
+      try {
+        const res = await api.get(`/api/customers${qs({ search: term, limit: 8 })}`);
+        clear(results);
+        if (!res.data.length) {
+          results.append(el('div', { class: 'search__empty', text: `No customer matches “${term}”` }));
+        }
+        for (const c of res.data) {
+          results.append(el('button', {
+            type: 'button', class: 'search__item',
+            style: 'width:100%;text-align:left;border:0;background:none;cursor:pointer',
+            onClick: () => choose(c),
+          }, [
+            el('div', { class: 'cell-title', text: c.full_name }),
+            el('div', { class: 'cell-sub', text: [c.passport_no, c.phone].filter(Boolean).join(' · ') || '—' }),
+          ]));
+        }
+        results.hidden = false;
+      } catch { results.hidden = true; }
+    }, 250);
+  });
+  search.addEventListener('blur', () => setTimeout(() => { results.hidden = true; }, 180));
+
+  const node = el('div', { class: 'field span-2' }, [
+    el('label', { text: label + (required ? ' *' : '') }),
+    el('div', { class: 'search', style: 'max-width:none' }, [search, results]),
+    hidden,
+    hintNode,
+  ]);
+  node.selectedId = () => hidden.value;
+  return node;
+}
