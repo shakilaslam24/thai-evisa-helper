@@ -128,7 +128,10 @@ router.get('/settings', wrap((req, res) => {
       company_tagline: company.company_tagline || '',
       company_logo_url: company.company_logo_url || '',
       company_phone: company.company_phone || '',
+      company_phone_alt: company.company_phone_alt || '',
+      company_phone_alt2: company.company_phone_alt2 || '',
       company_email: company.company_email || '',
+      company_address: company.company_address || '',
     },
   });
 }));

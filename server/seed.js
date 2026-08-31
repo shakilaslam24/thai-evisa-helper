@@ -5,18 +5,28 @@ const { hashPassword } = require('./auth');
 const C = require('./constants');
 const vocab = require('./vocab');
 
+const COMPANY_ADDRESS = 'Fatema Villa, Lift-2, Flat-3B, House #104, Road #10/2, '
+  + 'Block D, Niketan, Gulshan-1, Dhaka';
+
 const DEFAULT_SETTINGS = {
   company_name: 'DreamFly Consultancy',
-  company_tagline: 'Visa, Tour & Work Package Specialists',
-  company_address: '',
-  company_phone: '',
-  company_phone_alt: '',
+  company_tagline: 'Fly Beyond Your Dreams',
+  company_address: COMPANY_ADDRESS,
+  company_phone: '01335374437',
+  company_phone_alt: '01335374438',
+  company_phone_alt2: '01335374439',
   company_email: '',
   company_website: '',
   company_logo_url: '',
   invoice_prefix: 'DF-INV',
   file_prefix: 'DF',
   public_tracking: '1',
+  // Left blank on purpose: until the system has a public address, the QR code
+  // is built from whatever address the invoice is being viewed on. Once the
+  // domain is live, set it once in Settings and every invoice follows.
+  tracking_url: '',
+  invoice_show_qr: '1',
+  invoice_qr_caption: 'Scan to track your application',
   invoice_currency: 'BDT',
   invoice_footer: 'Thank you for choosing DreamFly Consultancy.',
   invoice_terms: 'Payment is due within 7 days of the invoice date.',
@@ -26,6 +36,19 @@ const DEFAULT_SETTINGS = {
   notify_payment_due: '1',
   notify_interview_reminder: '1',
   notify_missing_documents: '1',
+};
+
+/**
+ * Placeholders that shipped before the real company details were known. A
+ * stored value is only replaced while it is still one of these, so anything
+ * typed in Settings — by this company or by anyone else using the system —
+ * is never overwritten by an upgrade.
+ */
+const REPLACEABLE_PLACEHOLDERS = {
+  company_tagline: ['Visa, Tour & Work Package Specialists'],
+  company_address: [''],
+  company_phone: [''],
+  company_phone_alt: [''],
 };
 
 /**
@@ -46,8 +69,12 @@ function seedLookups() {
 
 function seedSettings() {
   const insert = db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');
+  const update = db.prepare('UPDATE settings SET value = ? WHERE key = ? AND value = ?');
   const run = db.transaction(() => {
     for (const [k, v] of Object.entries(DEFAULT_SETTINGS)) insert.run(k, v);
+    for (const [k, placeholders] of Object.entries(REPLACEABLE_PLACEHOLDERS)) {
+      for (const old of placeholders) update.run(DEFAULT_SETTINGS[k], k, old);
+    }
   });
   run();
 }

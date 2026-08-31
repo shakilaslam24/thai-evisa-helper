@@ -85,8 +85,8 @@ inside the app under **Settings**.
 | **Reports** | Twelve reports covering leads, conversion, sources, follow-up, files, countries, partners, invoices, dues, collections and staff — each exportable to CSV. |
 | **Staff performance** | Leads handled, conversions, follow-ups completed, overdue items, meetings, files, approvals, rejections and revenue per team member. |
 | **Notifications** | In-app alerts for due and overdue follow-up, meeting reminders, interview dates, payment dues and missing documents. Overdue items re-notify daily rather than once, escalate to managers after two days, show an unread count in the browser tab, and can pop desktop alerts. |
-| **Client tracking** | A public page at `/track.html` where a client enters their passport number and name to see their own application status, key dates and outstanding documents — no login, rate limited, and carrying none of the internal record. |
-| **Settings** | Company profile, invoice and file-reference numbering, nine editable dropdown lists (countries, services, lead sources, document categories, payment methods, meeting types, the default file checklist, plus custom lead and file statuses), users and roles, notification switches. |
+| **Client tracking** | A public page at `/track.html` where a client enters their passport number and name to see their own application status, key dates and outstanding documents — no login, rate limited, and carrying none of the internal record. Every invoice prints a QR code that opens it. |
+| **Settings** | Company profile, invoice and file-reference numbering, the public tracking link and its invoice QR code, nine editable dropdown lists (countries, services, lead sources, document categories, payment methods, meeting types, the default file checklist, plus custom lead and file statuses), users and roles, notification switches. |
 
 ## User roles
 

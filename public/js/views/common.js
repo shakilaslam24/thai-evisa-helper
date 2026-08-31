@@ -306,3 +306,17 @@ export function customerPicker({
   node.selectedId = () => hidden.value;
   return node;
 }
+
+/**
+ * The address the invoice QR code points at.
+ *
+ * Whatever is set in Settings wins, so the link keeps working once the system
+ * moves to its own domain. Until then it falls back to the address the page is
+ * being served from, which is right for a local trial and for a first
+ * deployment where nobody has filled the field in yet.
+ */
+export function trackingUrl(settings = store.settings) {
+  const set = String(settings?.tracking_url || '').trim();
+  if (!set) return `${window.location.origin}/track.html`;
+  return /^https?:\/\//i.test(set) ? set : `https://${set.replace(/^\/+/, '')}`;
+}

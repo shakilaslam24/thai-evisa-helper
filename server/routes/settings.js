@@ -11,10 +11,11 @@ router.use(requireAuth);
 
 const COMPANY_KEYS = [
   'company_name', 'company_tagline', 'company_address', 'company_phone',
-  'company_phone_alt', 'company_email', 'company_website', 'company_logo_url',
+  'company_phone_alt', 'company_phone_alt2', 'company_email', 'company_website',
+  'company_logo_url',
   'invoice_prefix', 'invoice_currency', 'invoice_footer', 'invoice_terms',
-  'invoice_generated_note',
-  'file_prefix', 'public_tracking',
+  'invoice_generated_note', 'invoice_show_qr', 'invoice_qr_caption',
+  'file_prefix', 'public_tracking', 'tracking_url',
   'notify_followup_due', 'notify_meeting_reminder', 'notify_payment_due',
   'notify_interview_reminder', 'notify_missing_documents',
 ];

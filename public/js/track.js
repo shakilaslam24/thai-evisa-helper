@@ -24,11 +24,16 @@ async function loadBranding() {
 
     const contact = document.getElementById('contact');
     const bits = [];
-    if (s.company_phone) bits.push(el('a', { href: `tel:${s.company_phone}`, text: s.company_phone }));
+    for (const phone of [s.company_phone, s.company_phone_alt, s.company_phone_alt2]) {
+      if (phone) bits.push(el('a', { href: `tel:${phone.replace(/\s+/g, '')}`, text: phone }));
+    }
     if (s.company_email) bits.push(el('a', { href: `mailto:${s.company_email}`, text: s.company_email }));
     if (bits.length) {
-      contact.append('Need help? Contact us: ');
+      contact.append('Need help? Call us: ');
       bits.forEach((b, i) => { if (i) contact.append(' · '); contact.append(b); });
+    }
+    if (s.company_address) {
+      contact.append(el('div', { class: 'track-address', text: s.company_address }));
     }
     return s;
   } catch {

@@ -5,7 +5,8 @@ import {
 import { api, qs } from '../api.js';
 import { store, can } from '../store.js';
 import { navigate } from '../router.js';
-import { listPage, partnerOptions, customerPicker } from './common.js';
+import { listPage, partnerOptions, customerPicker, trackingUrl } from './common.js';
+import { qrSvg } from '../qr.js';
 
 /* ------------------------------ invoice form ------------------------------ */
 
@@ -273,6 +274,34 @@ export default function invoicesView() {
 
 /* ------------------------------- detail view ------------------------------- */
 
+/**
+ * The QR code a client scans to follow their own application.
+ *
+ * Error correction is set high enough that the code still reads after being
+ * printed small, folded or photocopied, which is what happens to an invoice.
+ * The link comes from Settings, so moving to a new domain does not mean
+ * reprinting anything that has already gone out — only the next invoice
+ * changes.
+ */
+function trackingBlock(company) {
+  if (String(company.invoice_show_qr ?? '1') === '0') return null;
+  let code;
+  try {
+    code = qrSvg(trackingUrl(company), { size: 92, level: 'Q', margin: 2, dark: '#101F40' });
+  } catch {
+    return null; // never let a bad link stop an invoice from printing
+  }
+  return el('div', { class: 'invoice-track' }, [
+    code,
+    el('div', { class: 'invoice-track__text' }, [
+      el('div', { class: 'invoice-track__title',
+        text: company.invoice_qr_caption || 'Scan to track your application' }),
+      el('div', { class: 'faint small',
+        text: 'Enter your passport number and your name to see the current status.' }),
+    ]),
+  ]);
+}
+
 export async function invoiceDetailView({ id }) {
   const res = await api.get(`/api/invoices/${id}`);
   const inv = res.data;
@@ -305,7 +334,8 @@ export async function invoiceDetailView({ id }) {
           el('div', { class: 'muted small' }, [
             company.company_tagline || '', el('br'),
             company.company_address || '', el('br'),
-            [company.company_phone, company.company_phone_alt].filter(Boolean).join(' · '), el('br'),
+            [company.company_phone, company.company_phone_alt, company.company_phone_alt2]
+              .filter(Boolean).join(' · '), el('br'),
             [company.company_email, company.company_website].filter(Boolean).join(' · '),
           ]),
         ]);
@@ -372,13 +402,17 @@ export async function invoiceDetailView({ id }) {
     ]),
 
     // No signature block: the invoice comes out of the system, so it states who
-    // raised it and says plainly that it needs no signature.
-    el('div', { class: 'invoice-signoff' }, [
-      el('div', { class: 'kv__label', text: 'Prepared by' }),
-      el('div', { class: 'invoice-signoff__name', text: inv.created_by_name || '—' }),
-      el('div', { class: 'faint small', text: fmtDate(inv.created_at) }),
-      el('div', { class: 'invoice-signoff__note', text: company.invoice_generated_note
-        || 'This is a computer-generated invoice and does not require a signature.' }),
+    // raised it and says plainly that it needs no signature. The tracking code
+    // sits opposite, so the client leaves with a way to follow their own file.
+    el('div', { class: 'invoice-foot' }, [
+      el('div', { class: 'invoice-signoff' }, [
+        el('div', { class: 'kv__label', text: 'Prepared by' }),
+        el('div', { class: 'invoice-signoff__name', text: inv.created_by_name || '—' }),
+        el('div', { class: 'faint small', text: fmtDate(inv.created_at) }),
+        el('div', { class: 'invoice-signoff__note', text: company.invoice_generated_note
+          || 'This is a computer-generated invoice and does not require a signature.' }),
+      ]),
+      trackingBlock(company),
     ]),
   ]);
 

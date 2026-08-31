@@ -4,12 +4,14 @@ import {
 } from '../ui.js';
 import { api } from '../api.js';
 import { store, loadReferenceData, can } from '../store.js';
-import { pageHead, partnerOptions } from './common.js';
+import { pageHead, partnerOptions, trackingUrl } from './common.js';
+import { qrSvg } from '../qr.js';
 import { parseHash, navigate } from '../router.js';
 
 const TABS = [
   ['company', 'Company details'],
   ['invoice', 'Invoice template'],
+  ['tracking', 'Tracking link & QR'],
   ['lists', 'Countries, services & lists'],
   ['users', 'Users & roles'],
   ['notifications', 'Notification settings'],
@@ -22,8 +24,8 @@ export default function settingsView() {
   const render = async () => {
     clear(host).append(spinner());
     const builders = {
-      company: companyPanel, invoice: invoicePanel, lists: listsPanel,
-      users: usersPanel, notifications: notificationsPanel,
+      company: companyPanel, invoice: invoicePanel, tracking: trackingPanel,
+      lists: listsPanel, users: usersPanel, notifications: notificationsPanel,
     };
     const node = await builders[active]();
     clear(host).append(node);
@@ -37,10 +39,11 @@ export default function settingsView() {
   ]);
 }
 
-function settingsForm(fields, { title, description }) {
+function settingsForm(fields, { title, description, extra, onSaved }) {
   const form = el('form', { class: 'stack' }, [
     description ? el('p', { class: 'muted mt-0', text: description }) : null,
     el('div', { class: 'form-grid' }, fields.map(field)),
+    extra || null,
   ]);
   const save = el('button', { class: 'btn btn--primary', type: 'submit', text: 'Save settings' });
   form.append(el('div', {}, save));
@@ -51,6 +54,7 @@ function settingsForm(fields, { title, description }) {
       const res = await api.put('/api/settings', formValues(form));
       store.settings = res.data;
       toast('Settings saved');
+      if (onSaved) onSaved();
     } catch (err) { toastError(err); } finally {
       save.disabled = false; save.textContent = 'Save settings';
     }
@@ -63,8 +67,9 @@ async function companyPanel() {
   return settingsForm([
     { name: 'company_name', label: 'Company name', value: s.company_name, required: true },
     { name: 'company_tagline', label: 'Tagline', value: s.company_tagline },
-    { name: 'company_phone', label: 'Phone number', value: s.company_phone },
-    { name: 'company_phone_alt', label: 'Alternate phone number', value: s.company_phone_alt },
+    { name: 'company_phone', label: 'Phone number 1', value: s.company_phone },
+    { name: 'company_phone_alt', label: 'Phone number 2', value: s.company_phone_alt },
+    { name: 'company_phone_alt2', label: 'Phone number 3', value: s.company_phone_alt2 },
     { name: 'company_email', label: 'Email address', type: 'email', value: s.company_email },
     { name: 'company_website', label: 'Website', value: s.company_website },
     { name: 'company_address', label: 'Office address', type: 'textarea', span: true, value: s.company_address },
@@ -90,6 +95,48 @@ async function invoicePanel() {
     title: 'Invoice & reference numbering',
     description: 'Numbering and the wording shown on every invoice you print or export.',
   });
+}
+
+async function trackingPanel() {
+  const s = store.settings;
+  const fallback = `${window.location.origin}/track.html`;
+  const preview = qrPreview();
+  return settingsForm([
+    { name: 'tracking_url', label: 'Public tracking link', span: true, value: s.tracking_url,
+      placeholder: fallback,
+      hint: `The address a client reaches by scanning the QR code. Leave this empty and `
+        + `${fallback} is used. Set it once your own domain is live, and every invoice `
+        + `printed after that carries the new link.` },
+    { name: 'invoice_show_qr', label: 'QR code on invoices', type: 'select', required: true,
+      options: [{ value: '1', label: 'Show on every invoice' }, { value: '0', label: 'Hide' }],
+      value: s.invoice_show_qr === '0' ? '0' : '1' },
+    { name: 'invoice_qr_caption', label: 'Wording beside the QR code', value: s.invoice_qr_caption,
+      hint: 'Printed next to the code, e.g. “Scan to track your application”' },
+  ], {
+    title: 'Tracking link & invoice QR code',
+    description: 'Clients scan the code on their invoice, then check their file with '
+      + 'their passport number and name. Change the link here and the code changes with it.',
+    extra: preview.node,
+    onSaved: preview.draw,
+  });
+}
+
+/** Shows the code the invoice will actually carry, so the link can be tested. */
+function qrPreview() {
+  const node = el('div', { class: 'qr-preview' });
+  const draw = () => {
+    const url = trackingUrl(store.settings);
+    clear(node).append(
+      qrSvg(url, { size: 132, level: 'Q' }),
+      el('div', { style: 'min-width:0' }, [
+        el('div', { class: 'kv__label', text: 'This is what the code opens' }),
+        el('div', { class: 'mono small', style: 'overflow-wrap:anywhere', text: url }),
+        el('a', { class: 'btn btn--sm mt-1', href: url, target: '_blank', text: 'Open the tracking page' }),
+      ]),
+    );
+  };
+  draw();
+  return { node, draw };
 }
 
 const LIST_TYPES = [

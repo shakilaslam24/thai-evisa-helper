@@ -456,6 +456,19 @@ fieldset.section > legend {
   body { background:#fff; }
   .card { border:0; box-shadow:none; }
   .invoice-sheet { box-shadow:none !important; border:0 !important; padding:0 !important; }
+  /* An invoice goes onto white paper, so it prints in the light palette even
+     when the screen is in dark mode. The QR code depends on that contrast:
+     a scanner reads dark modules on a light quiet zone, nothing else. */
+  .invoice-sheet {
+    color-scheme:light; print-color-adjust:exact; -webkit-print-color-adjust:exact;
+    background:#fff; color:#16233c;
+    --surface:#fff; --surface-2:#fff;
+    --text:#16233c; --text-soft:#5b6b88; --text-faint:#8a97ae;
+    --border:#e3e8f1; --border-strong:#ccd5e5; --brand-900:#101F40;
+    --ok-bg:#dcfce7; --ok-fg:#15803d; --warn-bg:#fef3c7; --warn-fg:#a16207;
+    --info-bg:#dbeafe; --info-fg:#1d4ed8; --danger-bg:#fee2e2; --danger-fg:#b91c1c;
+    --neutral-bg:#eef1f6; --neutral-fg:#475569;
+  }
   @page { margin:14mm; }
 }
 
@@ -491,11 +504,35 @@ fieldset.section > legend {
 .invoice-sheet tr { page-break-inside:avoid; break-inside:avoid; }
 
 /* Who raised the invoice, and room for a signature. */
-.invoice-signoff { margin-top:26px; padding-top:16px; border-top:1px solid var(--border);
-  page-break-inside:avoid; break-inside:avoid; }
+/* Who raised the invoice on the left, the tracking code on the right. The two
+   stack on a narrow screen, and the whole strip is kept off a page break. */
+.invoice-foot {
+  display:flex; gap:24px; align-items:flex-start; justify-content:space-between;
+  flex-wrap:wrap; margin-top:26px; padding-top:16px; border-top:1px solid var(--border);
+  page-break-inside:avoid; break-inside:avoid;
+}
+.invoice-foot > * { min-width:0; }
+.invoice-signoff { flex:1 1 260px; }
 .invoice-signoff__name { font-weight:650; margin-top:3px; }
 .invoice-signoff__note { margin-top:14px; font-size:12px; font-style:italic;
   color:var(--text-faint); }
+
+.invoice-track { display:flex; gap:12px; align-items:center; flex:0 1 300px; }
+.invoice-track svg { flex:0 0 auto; border-radius:4px; }
+.invoice-track__text { min-width:0; }
+.invoice-track__title { font-weight:600; font-size:13px; margin-bottom:3px;
+  overflow-wrap:anywhere; }
+
+/* The QR is always printed dark on white, whatever theme the screen is in —
+   a scanner needs the contrast the standard assumes. */
+.invoice-track svg rect:first-child { fill:#ffffff; }
+
+.qr-preview {
+  display:flex; gap:16px; align-items:center; flex-wrap:wrap;
+  padding:16px; border:1px solid var(--border); border-radius:12px;
+  background:var(--surface-2);
+}
+.qr-preview svg { flex:0 0 auto; border-radius:6px; }
 .invoice-totals { margin-left:auto; margin-top:16px; width:min(320px,100%); }
 .invoice-totals__row { display:flex; justify-content:space-between; padding:6px 0; font-size:13.5px; }
 .invoice-totals__row--grand { border-top:2px solid var(--border-strong); margin-top:6px;

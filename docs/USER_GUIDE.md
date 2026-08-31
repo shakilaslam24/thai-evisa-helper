@@ -210,8 +210,15 @@ Create an invoice from a customer profile, a file, a partner profile, or from
 - **Print** produces a clean invoice on paper. **Download PDF** opens the same print
   dialog — choose "Save as PDF" as the destination.
 
-Your company name, address, phone, email, payment terms and footer note come from
-**Settings → Company details** and **Invoice template**.
+Your company name, address, phone numbers, email, payment terms and footer note come
+from **Settings → Company details** and **Invoice template**.
+
+At the bottom of every invoice, the name of the person who raised it is printed in
+place of a signature, and beside it a **QR code**. A client scans that code with
+their phone camera, lands on the tracking page and checks their own file with their
+passport number and name — so they can stop calling the office for an update. The
+link behind the code, and whether it is printed at all, is set in
+**Settings → Tracking link & QR**.
 
 Payment status is `Unpaid`, `Partial Paid` or `Paid`, and updates itself as payments
 are recorded.
@@ -282,14 +289,26 @@ Each alert links straight to the record. Any type can be switched off under
 
 | Tab | What you control |
 | --- | --- |
-| **Company details** | Name, tagline, address, phone numbers, email, website, logo |
+| **Company details** | Name, tagline, address, three phone numbers, email, website, logo |
 | **Invoice template** | Number prefix, currency, payment terms, footer note |
+| **Tracking link & QR** | The public tracking address, and the QR code printed on invoices |
 | **Countries, services & lists** | Country list, service categories, lead sources, document categories |
 | **Users & roles** | Add users, set roles, deactivate accounts, reset passwords |
 | **Notification settings** | Switch each reminder type on or off |
 
 Removing an item from a list hides it from future dropdowns but never changes
 records that already use it.
+
+### The tracking link
+
+Leave **Public tracking link** empty and the QR code points at whatever address the
+system is being used on, which is right while you are testing. Once your own domain
+is live, put the full address in — `https://crm.yourcompany.com/track.html` — and
+save. Every invoice printed from then on carries the new link; invoices already
+handed out still point at the old one, so keep the old address working for a while.
+
+The preview under the field shows the code as it will print, and **Open the tracking
+page** checks the link before you commit to it.
 
 ### Roles
 
