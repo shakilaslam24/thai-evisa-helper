@@ -46,10 +46,17 @@ const ENTITY_TABLES = {
   customer: 'customers', case_file: 'case_files', partner: 'partners', lead: 'leads',
 };
 
+const ARCHIVABLE = new Set(['customers', 'case_files', 'partners', 'leads']);
+
 function assertEntity(type, id) {
   const table = ENTITY_TABLES[type];
   if (!table) bad('Documents can only be attached to a customer, file, partner or lead');
-  if (!db.prepare(`SELECT 1 FROM ${table} WHERE id = ?`).get(id)) notFound('Record not found');
+  const row = db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(id);
+  if (!row) notFound('Record not found');
+  // Nothing new attaches to a record that has been taken out of the system.
+  if (ARCHIVABLE.has(table) && row.deleted_at) {
+    bad('That record is archived — restore it before uploading anything to it');
+  }
 }
 
 /**

@@ -238,6 +238,7 @@ router.put('/:id', canWrite('invoices'), wrap((req, res) => {
   const id = Number(req.params.id);
   const before = db.prepare('SELECT * FROM invoices WHERE id = ?').get(id);
   if (!before) notFound('Invoice not found');
+  if (before.deleted_at) bad('This invoice is archived — restore it before editing');
   if (before.status === 'Cancelled') bad('A cancelled invoice cannot be edited');
   assertUnchanged(before, req.body, 'invoice');
 

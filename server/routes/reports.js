@@ -109,7 +109,8 @@ const REPORTS = {
       LEFT JOIN customers c ON c.id = f.customer_id
       LEFT JOIN users u ON u.id = f.assigned_to
       LEFT JOIN partners p ON p.id = f.partner_id
-      WHERE f.status IN (${ACTIVE_FILE_STATUSES.map(() => '?').join(',')})${sc.own('f.assigned_to')}
+      WHERE f.deleted_at IS NULL
+        AND f.status IN (${ACTIVE_FILE_STATUSES.map(() => '?').join(',')})${sc.own('f.assigned_to')}
       ORDER BY f.created_at DESC
     `).all(...ACTIVE_FILE_STATUSES)
       .map((r) => [r.reference_no, r.customer || '—', r.country || '—', r.service_type || '—',

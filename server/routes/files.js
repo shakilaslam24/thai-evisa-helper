@@ -422,7 +422,9 @@ router.post('/:id/restore', requireRole('admin'), wrap((req, res) => {
 
 router.post('/:id/checklist', canWrite('files'), wrap((req, res) => {
   const id = Number(req.params.id);
-  if (!db.prepare('SELECT 1 FROM case_files WHERE id = ?').get(id)) notFound('File not found');
+  const file = db.prepare('SELECT deleted_at FROM case_files WHERE id = ?').get(id);
+  if (!file) notFound('File not found');
+  if (file.deleted_at) bad('This file is archived — restore it before changing its checklist');
   requireFields(req.body, ['name']);
   const info = db.prepare('INSERT INTO document_checklist (case_file_id, name, note) VALUES (?, ?, ?)')
     .run(id, String(req.body.name).trim(), req.body.note || null);
@@ -432,6 +434,8 @@ router.post('/:id/checklist', canWrite('files'), wrap((req, res) => {
 
 router.patch('/:id/checklist/:itemId', canWrite('files'), wrap((req, res) => {
   const itemId = Number(req.params.itemId);
+  const parent = db.prepare('SELECT deleted_at FROM case_files WHERE id = ?').get(Number(req.params.id));
+  if (parent?.deleted_at) bad('This file is archived — restore it before changing its checklist');
   const item = db.prepare('SELECT * FROM document_checklist WHERE id = ? AND case_file_id = ?')
     .get(itemId, Number(req.params.id));
   if (!item) notFound('Checklist item not found');

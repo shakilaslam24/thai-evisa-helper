@@ -8,31 +8,48 @@ const { rateLimiter, clientIp } = require('../ratelimit');
 const router = express.Router();
 
 /**
- * Two limits, because they stop different attacks.
+ * Three limits, and one rule that keeps them from becoming an attack themselves.
  *
- * Per-account: someone grinding one known address — the admin's, say — is
- * stopped after ten wrong guesses however many machines they use. Per-address:
- * someone spraying one password across many accounts from one machine is stopped
- * after thirty. A correct password refunds the attempt, so a person who mistypes
- * twice and then signs in has spent nothing.
+ * The rule: a correct password always gets in. Both meaningful limits are checked
+ * only *after* the password has been verified, and only when it was wrong.
+ * Blocking before that meant anyone who knew a staff email — every client who has
+ * ever been emailed — could send ten wrong passwords and lock that person out for
+ * fifteen minutes, over and over, the administrator included. It was worse behind
+ * an office NAT, where thirty mistyped passwords across the whole team would have
+ * shut everyone out from one shared address.
+ *
+ *   perAccount  10 failures / 15 min  — stops someone grinding one known address
+ *   perAddress  30 failures / 15 min  — stops one machine spraying many accounts
+ *   perAddressHard  300 / 15 min      — checked first, purely so a flood cannot
+ *                                       burn the CPU on password hashing. No real
+ *                                       office comes close to it.
  */
+const WINDOW = 15 * 60 * 1000;
+
 const perAccount = rateLimiter({
-  windowMs: 15 * 60 * 1000,
+  windowMs: WINDOW,
   max: 10,
-  onlyCountFailures: true,
   keyOf: (req) => `account:${String(req.body?.email || '').trim().toLowerCase()}`,
-  message: 'Too many sign-in attempts for this account. Please try again in {minutes} minute(s).',
+  message: 'Too many failed attempts for this account. Wait {minutes} minute(s), '
+    + 'or ask an administrator to reset the password.',
 });
 
 const perAddress = rateLimiter({
-  windowMs: 15 * 60 * 1000,
+  windowMs: WINDOW,
   max: 30,
-  onlyCountFailures: true,
   keyOf: (req) => `ip:${clientIp(req)}`,
-  message: 'Too many sign-in attempts from this device. Please try again in {minutes} minute(s).',
+  message: 'Too many failed sign-in attempts from this device. '
+    + 'Please try again in {minutes} minute(s).',
 });
 
-router.post('/login', perAccount, perAddress, wrap((req, res) => {
+const perAddressHard = rateLimiter({
+  windowMs: WINDOW,
+  max: 300,
+  keyOf: (req) => `flood:${clientIp(req)}`,
+  message: 'Too many sign-in requests. Please try again in {minutes} minute(s).',
+});
+
+router.post('/login', perAddressHard, wrap((req, res) => {
   const email = String(req.body.email || '').trim().toLowerCase();
   const password = String(req.body.password || '');
   if (!email || !password) bad('Email and password are required');
@@ -40,12 +57,19 @@ router.post('/login', perAccount, perAddress, wrap((req, res) => {
   const user = db.prepare('SELECT * FROM users WHERE lower(email) = ?').get(email);
   // Same message either way so the form cannot be used to enumerate accounts.
   if (!user || !auth.verifyPassword(password, user.password_hash)) {
+    perAccount.countFailure(req);
+    perAddress.countFailure(req);
+    // Over either limit, a wrong guess is refused outright rather than merely
+    // answered. Guessing stops; signing in does not.
+    if (perAccount.isBlocked(req)) throw new HttpError(429, perAccount.messageFor(req));
+    if (perAddress.isBlocked(req)) throw new HttpError(429, perAddress.messageFor(req));
     throw new HttpError(401, 'Incorrect email or password');
   }
   if (!user.active) throw new HttpError(403, 'This account has been deactivated');
 
-  perAccount.succeeded(req);
-  perAddress.succeeded(req);
+  // The right password proves this was never a guess, so both counts go away.
+  perAccount.clear(req);
+  perAddress.clear(req);
   auth.purgeExpiredSessions();
   const { token, expires } = auth.createSession(user.id);
   auth.setSessionCookie(req, res, token, expires);

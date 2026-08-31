@@ -55,6 +55,29 @@ function rateLimiter({ windowMs, max, keyOf, message, onlyCountFailures = false 
     if (b && b.count > 0) b.count -= 1;
   };
 
+  /* ---- imperative use, for callers that must check the outcome first ---- */
+
+  /** Is this key already over its limit? Counts nothing. */
+  middleware.isBlocked = (req) => {
+    const key = keyOf(req);
+    const b = buckets.get(key);
+    return Boolean(b && Date.now() <= b.resetAt && b.count >= max);
+  };
+
+  middleware.minutesLeft = (req) => {
+    const b = buckets.get(keyOf(req));
+    if (!b) return 1;
+    return Math.max(1, Math.ceil((b.resetAt - Date.now()) / 60000));
+  };
+
+  middleware.messageFor = (req) => message.replace('{minutes}', String(middleware.minutesLeft(req)));
+
+  /** Record one bad attempt against this key. */
+  middleware.countFailure = (req) => { bucketFor(req).count += 1; };
+
+  /** Forget this key entirely — used when the right password finally arrives. */
+  middleware.clear = (req) => { buckets.delete(keyOf(req)); };
+
   middleware.reset = () => buckets.clear();
   return middleware;
 }

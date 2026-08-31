@@ -145,8 +145,12 @@ router.post('/', wrap((req, res) => {
   if (!passport || !name) bad('Please enter both your passport number and your name.');
   if (normalise(name).length < 3) bad('Please enter your name as written in your passport.');
 
+  // Archived customers are out of the system, so they are out of tracking too —
+  // otherwise a client whose record was deliberately withdrawn could still read
+  // its status from outside.
   const candidates = db.prepare(
-    'SELECT id, given_name, surname FROM customers WHERE upper(passport_no) = upper(?)'
+    `SELECT id, given_name, surname FROM customers
+     WHERE upper(trim(passport_no)) = upper(trim(?)) AND deleted_at IS NULL`
   ).all(passport);
   const customer = candidates.find((c) => nameMatches(name, c));
 
@@ -160,7 +164,7 @@ router.post('/', wrap((req, res) => {
   const files = db.prepare(`
     SELECT id, reference_no, country, service_type, status, submission_date,
            interview_date, embassy_date, completion_date, updated_at
-    FROM case_files WHERE customer_id = ? ORDER BY created_at DESC
+    FROM case_files WHERE customer_id = ? AND deleted_at IS NULL ORDER BY created_at DESC
   `).all(customer.id);
   if (!files.length) return notFound();
 
