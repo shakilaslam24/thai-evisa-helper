@@ -96,13 +96,25 @@ is at the desk, so any team member can raise a bill and take the money against i
 Roles differ in two other things instead: **how much of the company a person sees**,
 and **who may delete a record**.
 
-| Role | Day-to-day work | Sees | May delete |
+| Role | Day-to-day work | Sees | May archive |
 | --- | --- | --- | --- |
-| **Admin** | Everything, plus users and settings | The whole company | Files, documents, customers |
+| **Admin** | Everything, plus users and settings | The whole company | Customers, files, leads, partners, invoices, documents |
 | **Manager** | All of it | The whole company — pipeline and money | No |
 | **Accounts / Finance** | All of it | The whole company's money; own work in the sales pipeline | No |
-| **Staff / Executive** | All of it, invoices and payments included | Only their own work and their own sales | No |
+| **Staff / Executive** | All of it, invoices, payments and refunds included | Only their own work and their own sales | No |
 | **B2B Partner** | Nothing — read-only login | Only the files and invoices under their own partner account | No |
+
+**Nothing is deleted.** Customers, files, leads, partners and invoices are
+*archived*: the record and everything attached to it stays, it simply leaves
+every list, count and report, and an administrator can restore it. An invoice
+with money against it cannot be archived at all until the money is refunded.
+
+**Money goes back through a refund, not a deletion.** Anyone on the team can
+refund a payment — it is recorded as its own line beside the original receipt,
+with a reason, so the books show that money came in and money went back rather
+than that it was never received. Removing a payment row outright is an
+administrator correcting a typo, and the log keeps the amount, method,
+reference, date and who took it.
 
 Two reports — **Staff performance** and **Partner-wise** — are limited to admins and
 managers, and are not offered to anyone else.

@@ -128,6 +128,40 @@ router.get('/', wrap((req, res) => {
   res.json({ data: db.prepare(sql.join(' ')).all(...params) });
 }));
 
+/**
+ * The first bytes of a file, checked against what the upload claimed to be.
+ *
+ * multer takes the MIME type from the request, so it is whatever the client said
+ * — an executable could arrive labelled image/png. This reads the actual magic
+ * numbers. It is not a virus scanner; it stops the file from being something
+ * entirely different from its label.
+ */
+const MAGIC = [
+  { mime: /^image\/jpeg$/, bytes: [0xFF, 0xD8, 0xFF] },
+  { mime: /^image\/png$/, bytes: [0x89, 0x50, 0x4E, 0x47] },
+  { mime: /^image\/gif$/, bytes: [0x47, 0x49, 0x46, 0x38] },
+  { mime: /^application\/pdf$/, bytes: [0x25, 0x50, 0x44, 0x46] },
+  // Word, Excel and .docx/.xlsx are ZIP or OLE containers.
+  { mime: /openxmlformats|officedocument/, bytes: [0x50, 0x4B, 0x03, 0x04] },
+  { mime: /^application\/msword$|^application\/vnd\.ms-excel$/, bytes: [0xD0, 0xCF, 0x11, 0xE0] },
+];
+
+function contentMatchesType(filePath, mime) {
+  // webp and heic carry their marker further in; both are containers we accept
+  // on the strength of the allow-list alone.
+  if (/^image\/(webp|heic)$/.test(mime)) return true;
+  const expected = MAGIC.find((m) => m.mime.test(mime));
+  if (!expected) return true;
+  const fd = fs.openSync(filePath, 'r');
+  try {
+    const head = Buffer.alloc(8);
+    fs.readSync(fd, head, 0, 8, 0);
+    return expected.bytes.every((b, i) => head[i] === b);
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
 router.post('/', canWrite('documents'), upload.array('files', 10), wrap((req, res) => {
   const entityType = req.body.entity_type;
   const entityId = Number(req.body.entity_id);
@@ -137,6 +171,11 @@ router.post('/', canWrite('documents'), upload.array('files', 10), wrap((req, re
   try {
     assertEntity(entityType, entityId);
     guardDocumentScope(req, entityType, entityId);
+    for (const f of req.files) {
+      if (!contentMatchesType(f.path, f.mimetype)) {
+        bad(`"${f.originalname}" is not a real ${f.mimetype} file — it was renamed or is corrupt`);
+      }
+    }
   } catch (err) {
     for (const f of req.files) fs.rmSync(f.path, { force: true });
     throw err;
@@ -165,10 +204,34 @@ router.post('/', canWrite('documents'), upload.array('files', 10), wrap((req, re
   res.status(201).json({ data: saved });
 }));
 
+/**
+ * Every time a document is opened, it is recorded.
+ *
+ * These are passport scans, NIDs and bank statements, and any member of the team
+ * can reach them — which is right, because whoever is at the desk has to be able
+ * to serve a colleague's client. What was missing was accountability: nothing
+ * showed who had looked at what. Now the customer's own timeline carries it, so
+ * a question about access has an answer.
+ *
+ * Repeat views within the same minute are not logged again, so opening a file
+ * and scrolling through its attachments leaves one entry per document, not ten.
+ */
+function logDocumentAccess(req, doc) {
+  const minute = new Date().toISOString().slice(0, 16);
+  const key = `doc-access:${doc.id}:${req.user.id}:${minute}`;
+  const seen = db.prepare(`SELECT 1 FROM activities WHERE entity_type = ? AND entity_id = ?
+                           AND action = 'Document viewed' AND detail LIKE ?`)
+    .get(doc.entity_type, doc.entity_id, `%${key}%`);
+  if (seen) return;
+  logActivity(doc.entity_type, doc.entity_id, 'Document viewed',
+    `${doc.original_name} (${doc.category}) opened by ${req.user.name} [${key}]`, req.user.id);
+}
+
 router.get('/:id/download', wrap((req, res) => {
   const doc = db.prepare('SELECT * FROM documents WHERE id = ?').get(Number(req.params.id));
   if (!doc) notFound('Document not found');
   guardDocumentScope(req, doc.entity_type, doc.entity_id);
+  logDocumentAccess(req, doc);
   const filePath = path.join(UPLOAD_DIR, doc.stored_name);
   // Defence in depth: never serve anything resolving outside the upload directory.
   if (!filePath.startsWith(UPLOAD_DIR + path.sep) || !fs.existsSync(filePath)) {

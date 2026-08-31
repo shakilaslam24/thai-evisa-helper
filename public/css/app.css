@@ -211,7 +211,12 @@ input[type=date], input[type=datetime-local], input[type=time], select { color-s
 .grid--stats { grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); }
 .grid--2 { grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); }
 .grid--3 { grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); }
-.stack { display:grid; gap:14px; }
+/* A grid's implicit column sizes to its widest child, so one wide table used to
+   stretch the whole page — heading and all — and the entire screen scrolled
+   sideways on a phone. minmax(0,1fr) holds the column to the container, which
+   lets .table-wrap do its own scrolling instead. */
+.stack { display:grid; grid-template-columns:minmax(0,1fr); gap:14px; }
+.stack > * { min-width:0; }
 
 .stat {
   background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg);
@@ -253,7 +258,33 @@ a.stat:hover { text-decoration:none; border-color:var(--brand-500); box-shadow:v
 .badge--danger { background:var(--danger-bg); color:var(--danger-fg); }
 .badge--purple { background:var(--purple-bg); color:var(--purple-fg); }
 
-.table-wrap { overflow-x:auto; }
+.table-wrap {
+  overflow-x:auto; max-width:100%; min-width:0;
+  -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain;
+}
+.card, .card__body, .card__head { min-width:0; }
+/* A hint that there is more to the right, fading out once you reach the end. */
+@media (max-width:900px) {
+  .table-wrap { background:
+    linear-gradient(to right, var(--surface) 30%, transparent) left / 24px 100% no-repeat local,
+    linear-gradient(to left, var(--surface) 30%, transparent) right / 24px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, rgba(16,31,64,.12), transparent) left / 10px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, rgba(16,31,64,.12), transparent) right / 10px 100% no-repeat scroll;
+  }
+  table.data { font-size:12.5px; }
+  table.data th, table.data td { padding:9px 11px; }
+  /* Long identifiers wrapped onto four lines each and made every row huge. */
+  table.data .cell-title, table.data .mono { white-space:nowrap; }
+}
+
+/* On a phone the page heading and its buttons each get their own row, and a
+   long button label wraps rather than pushing the page sideways. */
+@media (max-width:560px) {
+  .content { padding:16px 12px; }
+  .page-head__text { min-width:0; }
+  .page-head__actions { width:100%; }
+  .page-head__actions > .btn { flex:1 1 auto; justify-content:center; white-space:normal; text-align:center; }
+}
 table.data { width:100%; border-collapse:collapse; font-size:13px; }
 table.data th {
   text-align:left; padding:9px 14px; background:var(--surface-2); color:var(--text-soft);

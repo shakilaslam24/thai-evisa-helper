@@ -52,6 +52,13 @@ export default async function reportsView() {
         flush: true,
         actions: [
           el('span', { class: 'faint small', text: r.range ? `${r.range.from} → ${r.range.to}` : '' }),
+          // Say plainly when the screen is showing part of the answer, so a
+          // visible total is never mistaken for the whole picture.
+          r.truncated ? el('span', {
+            class: 'badge badge--warn',
+            title: 'Narrow the date range, or use Export CSV for the complete list',
+            text: `Showing first ${r.truncated.shown} of ${r.truncated.total} rows`,
+          }) : null,
           el('a', {
             class: 'btn btn--sm', text: '⬇ Export CSV',
             href: `/api/reports/${state.key}/csv${qs({ date_from: state.from, date_to: state.to })}`,

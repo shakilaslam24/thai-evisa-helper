@@ -1,0 +1,35 @@
+# DreamFly CRM as a system service.
+#
+#   sudo cp scripts/dreamfly.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now dreamfly
+#
+# Check it:   systemctl status dreamfly
+# Read logs:  journalctl -u dreamfly -f
+
+[Unit]
+Description=DreamFly Consultancy CRM
+After=network.target
+
+[Service]
+Type=simple
+User=dreamfly
+WorkingDirectory=/opt/dreamfly
+EnvironmentFile=/opt/dreamfly/.env
+ExecStart=/usr/bin/node server/index.js
+Restart=always
+RestartSec=5
+
+# The service only ever needs its own directory.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/dreamfly/data /opt/dreamfly/backups
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=dreamfly
+
+[Install]
+WantedBy=multi-user.target

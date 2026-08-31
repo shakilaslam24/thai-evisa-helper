@@ -2,12 +2,14 @@
 const express = require('express');
 const { db } = require('../db');
 const vocab = require('../vocab');
-const { requireAuth, canWrite, denyPartner } = require('../auth');
+const { requireAuth, canWrite, requireRole, denyPartner } = require('../auth');
 const {
-  wrap, bad, notFound, pick, requireFields, oneOf, paging, orderBy, conditions,
-  logActivity, notify, diffSummary,
+  wrap, merge, archive, restore, bad, notFound, pick, requireFields, oneOf, paging, orderBy, conditions,
+  logActivity, notify, diffSummary, assertUnchanged,
 } = require('../helpers');
 const { LEAD_STATUSES, LEAD_PRIORITIES } = require('../constants');
+
+const v = require('../validate');
 
 const router = express.Router();
 router.use(requireAuth, denyPartner);
@@ -16,6 +18,23 @@ const FIELDS = [
   'full_name', 'phone', 'whatsapp', 'email', 'address', 'source', 'service_type',
   'country', 'priority', 'assigned_to', 'status', 'next_followup_at', 'initial_note',
 ];
+
+/** Same standards as a customer: forgiving on format, strict on impossibility. */
+function validateLead(data) {
+  data.full_name = v.text(data.full_name, 'Name', v.LIMITS.name);
+  if (!data.full_name) bad('A name is required');
+  data.email = v.email(data.email);
+  data.phone = v.phone(data.phone, 'Phone number');
+  data.whatsapp = v.phone(data.whatsapp, 'WhatsApp number');
+  data.address = v.text(data.address, 'Address', v.LIMITS.address);
+  data.initial_note = v.text(data.initial_note, 'Note', v.LIMITS.notes);
+  data.next_followup_at = v.dateTime(data.next_followup_at, 'Next follow-up');
+  data.country = data.country ? v.fromList(data.country, vocab.values('country'), 'Country') : null;
+  data.service_type = data.service_type
+    ? v.fromList(data.service_type, vocab.values('service'), 'Service') : null;
+  data.source = data.source ? v.fromList(data.source, vocab.values('lead_source'), 'Lead source') : null;
+  return data;
+}
 
 const LABELS = {
   full_name: 'Name', phone: 'Phone', whatsapp: 'WhatsApp', email: 'Email',
@@ -36,6 +55,8 @@ const SELECT = `
 router.get('/', wrap((req, res) => {
   const q = req.query;
   const w = conditions();
+  if (req.query.archived === '1') w.add('l.deleted_at IS NOT NULL');
+  else w.add('l.deleted_at IS NULL');
   if (q.search) {
     const like = `%${q.search}%`;
     w.add('(l.full_name LIKE ? OR l.phone LIKE ? OR l.whatsapp LIKE ? OR l.email LIKE ?)',
@@ -69,7 +90,7 @@ router.get('/:id', wrap((req, res) => {
 
 router.post('/', canWrite('leads'), wrap((req, res) => {
   requireFields(req.body, ['full_name']);
-  const data = pick(req.body, FIELDS);
+  const data = validateLead(pick(req.body, FIELDS));
   oneOf(data.priority, LEAD_PRIORITIES, 'priority');
   oneOf(data.status, vocab.values('lead_status'), 'status');
   data.priority ||= 'Warm';
@@ -107,7 +128,10 @@ router.put('/:id', canWrite('leads'), wrap((req, res) => {
   const before = db.prepare('SELECT * FROM leads WHERE id = ?').get(id);
   if (!before) notFound('Lead not found');
 
-  const data = pick(req.body, FIELDS);
+  if (before.deleted_at) bad('This lead is archived — restore it before editing');
+  assertUnchanged(before, req.body, 'lead');
+  // Absent fields keep what is stored, so a partial save cannot erase the rest.
+  const data = validateLead(merge(before, req.body, FIELDS));
   oneOf(data.priority, LEAD_PRIORITIES, 'priority');
   oneOf(data.status, vocab.values('lead_status'), 'status');
   data.priority ||= before.priority;
@@ -119,9 +143,9 @@ router.put('/:id', canWrite('leads'), wrap((req, res) => {
       address=@address, source=@source, service_type=@service_type, country=@country,
       priority=@priority, assigned_to=@assigned_to, status=@status,
       next_followup_at=@next_followup_at, initial_note=@initial_note,
-      updated_at=datetime('now')
+      updated_at=datetime('now','localtime'), updated_by=@updated_by, version=version+1
     WHERE id=@id
-  `).run({ ...data, id });
+  `).run({ ...data, updated_by: req.user.id, id });
 
   const summary = diffSummary(before, data, LABELS);
   if (summary) logActivity('lead', id, 'Lead updated', summary, req.user.id);
@@ -146,12 +170,38 @@ router.patch('/:id/status', canWrite('leads'), wrap((req, res) => {
   res.json({ data: db.prepare(`${SELECT} WHERE l.id = ?`).get(id) });
 }));
 
-router.delete('/:id', canWrite('leads'), wrap((req, res) => {
+/**
+ * Archive rather than delete: the lead's follow-ups, meetings and notes reference
+ * it by id with no foreign key, so a real delete left them pointing at nothing
+ * and still raising reminders under a blank name.
+ */
+router.delete('/:id', requireRole('admin'), wrap((req, res) => {
   const lead = db.prepare('SELECT * FROM leads WHERE id = ?').get(Number(req.params.id));
   if (!lead) notFound('Lead not found');
-  db.prepare('DELETE FROM leads WHERE id = ?').run(lead.id);
-  logActivity('lead', lead.id, 'Lead deleted', lead.full_name, req.user.id);
+  if (lead.deleted_at) bad('This lead is already archived');
+  if (lead.customer_id) bad('This lead became a customer — archive the customer instead');
+
+  db.transaction(() => {
+    archive('leads', lead.id, req.user.id, req.body?.reason);
+    // Nothing should keep chasing a lead that is no longer being worked.
+    db.prepare(`UPDATE followups SET status = 'Cancelled'
+                WHERE entity_type = 'lead' AND entity_id = ? AND status = 'Pending'`).run(lead.id);
+    db.prepare(`UPDATE meetings SET status = 'Cancelled'
+                WHERE entity_type = 'lead' AND entity_id = ? AND status = 'Scheduled'`).run(lead.id);
+  })();
+
+  logActivity('lead', lead.id, 'Lead archived',
+    `${lead.full_name} · open follow-ups and meetings cancelled`, req.user.id);
   res.json({ ok: true });
+}));
+
+router.post('/:id/restore', requireRole('admin'), wrap((req, res) => {
+  const lead = db.prepare('SELECT * FROM leads WHERE id = ?').get(Number(req.params.id));
+  if (!lead) notFound('Lead not found');
+  if (!lead.deleted_at) bad('This lead is not archived');
+  restore('leads', lead.id);
+  logActivity('lead', lead.id, 'Lead restored', lead.full_name, req.user.id);
+  res.json({ data: db.prepare(`${SELECT} WHERE l.id = ?`).get(lead.id) });
 }));
 
 /** Convert a lead into a full customer profile, carrying its details across. */

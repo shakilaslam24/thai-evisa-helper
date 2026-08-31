@@ -225,10 +225,26 @@ are recorded.
 
 ---
 
-## 11. Payments
+## 11. Payments and refunds
 
 Press **Record payment** on any unpaid invoice. Enter the amount, method (Cash,
 bKash, Nagad, Bank Transfer, Cheque, Card or Other), date and transaction reference.
+
+### Giving money back
+
+Open the invoice, find the payment in the **Payments and refunds** list and press
+**Refund**. Enter how much is going back and why — the reason is required,
+because it is the only thing that later tells a cancelled trip apart from a
+mistake.
+
+The refund appears as its own line next to the original receipt. Nothing is
+erased: the books show BDT 5,000 received on Tuesday and BDT 5,000 returned on
+Friday, which is what actually happened. The invoice goes back to Partial Paid
+or Unpaid on its own.
+
+Anyone on the team can issue a refund. **Deleting** a payment record is different
+— that is for an administrator fixing a mis-typed entry, and it is not how you
+return money to a client.
 
 Part payments are supported — the invoice moves to "Partial Paid" and shows the
 outstanding balance. The system will not let you record more than is outstanding.

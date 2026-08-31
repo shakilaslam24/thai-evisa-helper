@@ -18,7 +18,8 @@ export default function paymentsView() {
     emptyIcon: '৳',
     actions: [can('payments') ? el('a', {
       class: 'btn btn--primary', href: '#/invoices?due=1',
-      text: 'Record a payment → open an unpaid invoice',
+      text: '+ Record a payment',
+      title: 'Opens the list of unpaid invoices — record the payment on the bill it belongs to',
     }) : null],
     filters: [
       { name: 'method', label: 'Method', type: 'select', options: store.enums.payment_methods },

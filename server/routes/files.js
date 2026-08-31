@@ -4,9 +4,10 @@ const { db } = require('../db');
 const vocab = require('../vocab');
 const { requireAuth, canWrite, requireRole } = require('../auth');
 const {
-  wrap, bad, notFound, pick, requireFields, oneOf, paging, orderBy, conditions,
-  logActivity, notify, diffSummary, HttpError,
+  wrap, bad, notFound, pick, merge, requireFields, oneOf, paging, orderBy, conditions,
+  logActivity, notify, diffSummary, HttpError, archive, restore, clean, assertUnchanged,
 } = require('../helpers');
+const v = require('../validate');
 const {
   FILE_STATUSES, ACTIVE_FILE_STATUSES, CHECKLIST_STATUSES,
   DEFAULT_CHECKLIST_ITEMS, PAYMENT_STATUSES,
@@ -14,6 +15,12 @@ const {
 
 const router = express.Router();
 router.use(requireAuth);
+
+/** Today on the server's clock, matching how every other date is stored. */
+function todayLocal() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 const FIELDS = [
   'customer_id', 'partner_id', 'country', 'service_type', 'file_type', 'application_type',
@@ -52,12 +59,51 @@ const SELECT = `
 function nextReferenceNo() {
   const year = new Date().getFullYear();
   const prefix = `${vocab.setting('file_prefix', 'DF')}-${year}-`;
-  const last = db.prepare(
-    'SELECT reference_no FROM case_files WHERE reference_no LIKE ? ORDER BY id DESC LIMIT 1'
-  ).get(`${prefix}%`);
-  const seq = last ? Number(String(last.reference_no).slice(prefix.length)) + 1 : 1;
-  return `${prefix}${String(seq).padStart(4, '0')}`;
+  // Highest numeric suffix rather than the last row created, so a reference that
+  // is not a plain number cannot turn the next one into NaN and, because the
+  // column is unique, block every file opened afterwards.
+  const rows = db.prepare(
+    "SELECT reference_no FROM case_files WHERE reference_no LIKE ? ESCAPE '\\'"
+  ).all(`${prefix.replace(/[%_\\]/g, '\\$&')}%`);
+  let highest = 0;
+  for (const r of rows) {
+    const suffix = String(r.reference_no).slice(prefix.length);
+    if (!/^\d+$/.test(suffix)) continue;
+    const n = Number(suffix);
+    if (Number.isSafeInteger(n) && n > highest) highest = n;
+  }
+  return `${prefix}${String(highest + 1).padStart(4, '0')}`;
 }
+
+const DATE_FIELDS = {
+  submission_date: 'Submission date',
+  interview_date: 'Interview date',
+  embassy_date: 'Embassy/VFS date',
+  completion_date: 'Completion date',
+};
+
+function validateFileDates(data) {
+  for (const [field, label] of Object.entries(DATE_FIELDS)) {
+    if (data[field] !== undefined && data[field] !== null) data[field] = v.date(data[field], label);
+  }
+  data.remarks = v.text(data.remarks, 'Remarks', v.LIMITS.notes);
+  data.stage = v.text(data.stage, 'Processing stage', v.LIMITS.line);
+  data.file_type = v.text(data.file_type, 'File type', v.LIMITS.short);
+  data.application_type = v.text(data.application_type, 'Application type', v.LIMITS.short);
+  return data;
+}
+
+/**
+ * Statuses that mean the application is finished, one way or another.
+ *
+ * Any status can still move to any other — an office needs that latitude, and a
+ * rejection genuinely can be appealed back into processing. What changed is that
+ * leaving a finished state is now a deliberate act: the caller has to say
+ * `reopen: true`, which is what the confirmation dialog sends. Without it a
+ * mis-click cannot quietly turn a Rejected file back into Under Processing, or
+ * a Completed one back into Draft, while the client is watching the tracking page.
+ */
+const CLOSED_STATUSES = ['Approved', 'Rejected', 'Delivered', 'Completed'];
 
 function guardPartnerScope(req, file) {
   if (req.user.role === 'partner' && file.partner_id !== req.user.partner_id) {
@@ -84,6 +130,8 @@ router.get('/', wrap((req, res) => {
   w.addIf(q.payment_status, 'f.payment_status = ?');
   w.addIf(q.date_from, 'date(f.created_at) >= date(?)');
   w.addIf(q.date_to, 'date(f.created_at) <= date(?)');
+  if (q.archived === '1') w.add('f.deleted_at IS NOT NULL');
+  else w.add('f.deleted_at IS NULL');
   if (q.active === '1') {
     w.add(`f.status IN (${ACTIVE_FILE_STATUSES.map(() => '?').join(',')})`, ...ACTIVE_FILE_STATUSES);
   }
@@ -124,6 +172,7 @@ router.get('/:id', wrap((req, res) => {
 router.post('/', canWrite('files'), wrap((req, res) => {
   requireFields(req.body, ['customer_id']);
   const data = pick(req.body, FIELDS);
+  validateFileDates(data);
   oneOf(data.status, vocab.values('file_status'), 'status');
   oneOf(data.payment_status, PAYMENT_STATUSES, 'payment status');
   data.status ||= 'Draft';
@@ -149,7 +198,8 @@ router.post('/', canWrite('files'), wrap((req, res) => {
         @interview_date, @embassy_date, @completion_date, @payment_status, @remarks, @created_by)
     `).run({
       ...data,
-      reference_no: req.body.reference_no || nextReferenceNo(),
+      // Issued by the system, never taken from the request.
+      reference_no: nextReferenceNo(),
       created_by: req.user.id,
     });
     const id = info.lastInsertRowid;
@@ -180,8 +230,23 @@ router.post('/partner-entry', canWrite('files'), wrap((req, res) => {
 
   const run = db.transaction(() => {
     let customer = b.passport_no
-      ? db.prepare('SELECT * FROM customers WHERE passport_no = ?').get(String(b.passport_no).trim())
+      ? db.prepare(`SELECT * FROM customers WHERE upper(trim(passport_no)) = upper(trim(?))
+                    AND deleted_at IS NULL`).get(String(b.passport_no).trim())
       : null;
+
+    // Reusing the existing traveller is right — the same person applying again.
+    // Silently keeping their old name when a different one was typed is not: it
+    // is how two people with a mistyped passport number became one client.
+    if (customer) {
+      const typed = `${b.given_name || ''} ${b.surname || ''}`.trim().toLowerCase();
+      const stored = `${customer.given_name || ''} ${customer.surname || ''}`.trim().toLowerCase();
+      if (typed && stored && typed !== stored && !b.confirm_existing_customer) {
+        const storedName = `${customer.given_name} ${customer.surname || ''}`.trim();
+        const typedName = `${b.given_name} ${b.surname || ''}`.trim();
+        bad(`Passport ${String(b.passport_no).trim()} is already on file for ${storedName}, `
+          + `not ${typedName}. Check the passport number, or confirm it is the same person.`);
+      }
+    }
 
     if (!customer) {
       const info = db.prepare(`
@@ -205,7 +270,7 @@ router.post('/partner-entry', canWrite('files'), wrap((req, res) => {
       VALUES (@reference_no, @customer_id, @partner_id, @country, @service_type,
         @status, @assigned_to, @remarks, @created_by)
     `).run({
-      reference_no: b.reference_no || nextReferenceNo(),
+      reference_no: nextReferenceNo(),
       customer_id: customer.id, partner_id: partnerId,
       country: b.country || customer.country,
       service_type: b.service_type || customer.service_type,
@@ -229,7 +294,12 @@ router.put('/:id', canWrite('files'), wrap((req, res) => {
   const id = Number(req.params.id);
   const before = db.prepare('SELECT * FROM case_files WHERE id = ?').get(id);
   if (!before) notFound('File not found');
-  const data = pick(req.body, FIELDS);
+  if (before.deleted_at) bad('This file is archived — restore it before editing');
+  assertUnchanged(before, req.body, 'file');
+  // Fields the request did not mention keep the value they already had. Writing
+  // NULL for everything absent meant a caller that sent only {status} erased the
+  // interview date, the assigned staff member and the partner link.
+  const data = validateFileDates(merge(before, req.body, FIELDS));
   oneOf(data.status, vocab.values('file_status'), 'status');
   oneOf(data.payment_status, PAYMENT_STATUSES, 'payment status');
   data.status ||= before.status;
@@ -238,14 +308,21 @@ router.put('/:id', canWrite('files'), wrap((req, res) => {
   data.partner_id = data.partner_id ? Number(data.partner_id) : null;
   data.assigned_to = data.assigned_to ? Number(data.assigned_to) : null;
 
+  if (data.status !== before.status
+      && CLOSED_STATUSES.includes(before.status) && !CLOSED_STATUSES.includes(data.status)
+      && !req.body.reopen) {
+    bad(`This file is marked ${before.status}. Reopening it needs to be confirmed.`);
+  }
+
   db.prepare(`
     UPDATE case_files SET customer_id=@customer_id, partner_id=@partner_id, country=@country,
       service_type=@service_type, file_type=@file_type, application_type=@application_type,
       submission_date=@submission_date, stage=@stage, status=@status, assigned_to=@assigned_to,
       interview_date=@interview_date, embassy_date=@embassy_date, completion_date=@completion_date,
-      payment_status=@payment_status, remarks=@remarks, updated_at=datetime('now')
+      payment_status=@payment_status, remarks=@remarks,
+      updated_at=datetime('now','localtime'), updated_by=@updated_by, version=version+1
     WHERE id=@id
-  `).run({ ...data, id });
+  `).run({ ...data, updated_by: req.user.id, id });
 
   const summary = diffSummary(before, data, LABELS);
   if (summary) logActivity('case_file', id, 'File updated', summary, req.user.id);
@@ -265,15 +342,29 @@ router.patch('/:id/status', canWrite('files'), wrap((req, res) => {
   const status = oneOf(req.body.status, vocab.values('file_status'), 'status');
   if (!status) bad('Status is required');
 
-  const patch = { status, id, completion_date: file.completion_date };
-  // Closing statuses stamp a completion date automatically if none was set.
-  if (['Completed', 'Delivered', 'Approved', 'Rejected'].includes(status) && !file.completion_date) {
-    patch.completion_date = new Date().toISOString().slice(0, 10);
-  }
-  db.prepare(`UPDATE case_files SET status = @status, completion_date = @completion_date,
-              updated_at = datetime('now') WHERE id = @id`).run(patch);
+  if (file.deleted_at) bad('This file is archived — restore it before changing its status');
 
-  logActivity('case_file', id, 'Status changed', `${file.status} → ${status}`, req.user.id);
+  const reopening = CLOSED_STATUSES.includes(file.status) && !CLOSED_STATUSES.includes(status);
+  if (reopening && !req.body.reopen) {
+    bad(`This file is marked ${file.status}. Reopening it needs to be confirmed.`);
+  }
+
+  const patch = { status, id, completion_date: file.completion_date, updated_by: req.user.id };
+  // Closing statuses stamp a completion date automatically if none was set…
+  if (CLOSED_STATUSES.includes(status) && !file.completion_date) {
+    patch.completion_date = todayLocal();
+  }
+  // …and reopening clears it again, so "completed this month" cannot count a
+  // file that is demonstrably back in progress.
+  if (reopening) patch.completion_date = null;
+
+  db.prepare(`UPDATE case_files SET status = @status, completion_date = @completion_date,
+              updated_at = datetime('now','localtime'), updated_by = @updated_by,
+              version = version + 1
+              WHERE id = @id`).run(patch);
+
+  logActivity('case_file', id, reopening ? 'File reopened' : 'Status changed',
+    `${file.status} → ${status}` + (reopening ? ' (completion date cleared)' : ''), req.user.id);
   if (file.customer_id) logActivity('customer', file.customer_id, 'File status changed',
     `${file.reference_no}: ${file.status} → ${status}`, req.user.id);
   if (file.partner_id) logActivity('partner', file.partner_id, 'File status changed',
@@ -287,14 +378,44 @@ router.patch('/:id/status', canWrite('files'), wrap((req, res) => {
   res.json({ data: db.prepare(`${SELECT} WHERE f.id = ?`).get(id) });
 }));
 
-// Deleting a file destroys its checklist, documents and history, so only an
-// administrator may do it.
+/**
+ * Archive rather than delete.
+ *
+ * A real DELETE took the checklist and the case history with it and orphaned the
+ * documents, leaving scans on disk that belonged to a client who no longer
+ * existed. Archiving takes the file out of every list, count and report while
+ * leaving everything attached to it intact and reversible.
+ */
 router.delete('/:id', requireRole('admin'), wrap((req, res) => {
   const file = db.prepare('SELECT * FROM case_files WHERE id = ?').get(Number(req.params.id));
   if (!file) notFound('File not found');
-  db.prepare('DELETE FROM case_files WHERE id = ?').run(file.id);
-  logActivity('case_file', file.id, 'File deleted', file.reference_no, req.user.id);
+  if (file.deleted_at) bad('This file is already archived');
+
+  const live = db.prepare(`SELECT COUNT(*) n, COALESCE(SUM(paid),0) paid FROM invoices
+                           WHERE case_file_id = ? AND deleted_at IS NULL AND status != 'Cancelled'`)
+    .get(file.id);
+  if (live.paid > 0) {
+    bad(`This file has ${live.paid.toFixed(2)} received against its invoices. `
+      + 'Refund or reassign those first — archiving would hide money that was collected.');
+  }
+
+  archive('case_files', file.id, req.user.id, req.body?.reason);
+  logActivity('case_file', file.id, 'File archived',
+    `${file.reference_no} · was ${file.status}`
+    + (req.body?.reason ? ` · reason: ${clean(req.body.reason)}` : ''), req.user.id);
+  if (file.customer_id) {
+    logActivity('customer', file.customer_id, 'File archived', file.reference_no, req.user.id);
+  }
   res.json({ ok: true });
+}));
+
+router.post('/:id/restore', requireRole('admin'), wrap((req, res) => {
+  const file = db.prepare('SELECT * FROM case_files WHERE id = ?').get(Number(req.params.id));
+  if (!file) notFound('File not found');
+  if (!file.deleted_at) bad('This file is not archived');
+  restore('case_files', file.id);
+  logActivity('case_file', file.id, 'File restored', file.reference_no, req.user.id);
+  res.json({ data: db.prepare(`${SELECT} WHERE f.id = ?`).get(file.id) });
 }));
 
 /* --------------------------- document checklist --------------------------- */

@@ -38,7 +38,7 @@ const REPORTS = {
         SELECT date(created_at) AS d, COUNT(*) total,
                SUM(CASE WHEN status = 'Converted' THEN 1 ELSE 0 END) converted,
                SUM(CASE WHEN status = 'Not Interested' THEN 1 ELSE 0 END) lost
-        FROM leads WHERE date(created_at) BETWEEN date(?) AND date(?)${sc.own('assigned_to')}
+        FROM leads WHERE deleted_at IS NULL AND date(created_at) BETWEEN date(?) AND date(?)${sc.own('assigned_to')}
         GROUP BY d ORDER BY d DESC
       `).all(from, to).map((r) => [r.d, r.total, r.converted, r.lost]),
       range: { from, to },
@@ -50,7 +50,7 @@ const REPORTS = {
     const rows = db.prepare(`
       SELECT strftime('%Y-%m', created_at) AS m, COUNT(*) total,
              SUM(CASE WHEN status = 'Converted' THEN 1 ELSE 0 END) converted
-      FROM leads WHERE date(created_at) BETWEEN date(?) AND date(?)${sc.own('assigned_to')}
+      FROM leads WHERE deleted_at IS NULL AND date(created_at) BETWEEN date(?) AND date(?)${sc.own('assigned_to')}
       GROUP BY m ORDER BY m DESC
     `).all(from, to);
     return {
@@ -67,7 +67,7 @@ const REPORTS = {
     const rows = db.prepare(`
       SELECT COALESCE(source,'Not set') s, COUNT(*) total,
              SUM(CASE WHEN status = 'Converted' THEN 1 ELSE 0 END) converted
-      FROM leads WHERE date(created_at) BETWEEN date(?) AND date(?)${sc.own('assigned_to')}
+      FROM leads WHERE deleted_at IS NULL AND date(created_at) BETWEEN date(?) AND date(?)${sc.own('assigned_to')}
       GROUP BY s ORDER BY total DESC
     `).all(from, to);
     return {
@@ -122,7 +122,7 @@ const REPORTS = {
       SELECT COALESCE(country,'Not set') c, COUNT(*) total,
              SUM(CASE WHEN status = 'Approved' THEN 1 ELSE 0 END) approved,
              SUM(CASE WHEN status = 'Rejected' THEN 1 ELSE 0 END) rejected
-      FROM case_files WHERE date(created_at) BETWEEN date(?) AND date(?)${sc.own('assigned_to')}
+      FROM case_files WHERE deleted_at IS NULL AND date(created_at) BETWEEN date(?) AND date(?)${sc.own('assigned_to')}
       GROUP BY c ORDER BY total DESC
     `).all(from, to);
     return {
@@ -160,19 +160,39 @@ const REPORTS = {
   },
 
   /* ---- partners ---- */
-  partner_wise: (q, sc) => ({
+  /**
+   * One pass over each table and a join, rather than six correlated subqueries
+   * per partner. At a thousand partners the old shape took about a second; this
+   * is a few milliseconds and gives identical numbers.
+   */
+  partner_wise: () => ({
     title: 'Partner-wise File Report',
     columns: ['Partner', 'Company', 'Files', 'Processing', 'Approved', 'Rejected', 'Billed', 'Due'],
     rows: db.prepare(`
+      WITH file_counts AS (
+        SELECT partner_id,
+               COUNT(*) total,
+               SUM(CASE WHEN status IN (${ACTIVE_FILE_STATUSES.map(() => '?').join(',')}) THEN 1 ELSE 0 END) processing,
+               SUM(CASE WHEN status = 'Approved' THEN 1 ELSE 0 END) approved,
+               SUM(CASE WHEN status = 'Rejected' THEN 1 ELSE 0 END) rejected
+        FROM case_files WHERE partner_id IS NOT NULL AND deleted_at IS NULL
+        GROUP BY partner_id
+      ),
+      money AS (
+        SELECT partner_id, COALESCE(SUM(total),0) billed, COALESCE(SUM(total - paid),0) due
+        FROM invoices
+        WHERE partner_id IS NOT NULL AND status != 'Cancelled' AND deleted_at IS NULL
+        GROUP BY partner_id
+      )
       SELECT p.partner_name, p.company_name,
-        (SELECT COUNT(*) FROM case_files f WHERE f.partner_id = p.id) total,
-        (SELECT COUNT(*) FROM case_files f WHERE f.partner_id = p.id
-          AND f.status IN (${ACTIVE_FILE_STATUSES.map(() => '?').join(',')})) processing,
-        (SELECT COUNT(*) FROM case_files f WHERE f.partner_id = p.id AND f.status = 'Approved') approved,
-        (SELECT COUNT(*) FROM case_files f WHERE f.partner_id = p.id AND f.status = 'Rejected') rejected,
-        (SELECT COALESCE(SUM(total),0) FROM invoices i WHERE i.partner_id = p.id AND i.status != 'Cancelled') billed,
-        (SELECT COALESCE(SUM(total - paid),0) FROM invoices i WHERE i.partner_id = p.id AND i.status != 'Cancelled') due
-      FROM partners p ORDER BY total DESC, p.partner_name
+             COALESCE(fc.total,0) total, COALESCE(fc.processing,0) processing,
+             COALESCE(fc.approved,0) approved, COALESCE(fc.rejected,0) rejected,
+             COALESCE(m.billed,0) billed, COALESCE(m.due,0) due
+      FROM partners p
+      LEFT JOIN file_counts fc ON fc.partner_id = p.id
+      LEFT JOIN money m ON m.partner_id = p.id
+      WHERE p.deleted_at IS NULL
+      ORDER BY total DESC, p.partner_name
     `).all(...ACTIVE_FILE_STATUSES)
       .map((r) => [r.partner_name, r.company_name || '—', r.total, r.processing,
         r.approved, r.rejected, r.billed.toFixed(2), r.due.toFixed(2)]),
@@ -191,7 +211,8 @@ const REPORTS = {
         LEFT JOIN customers c ON c.id = i.customer_id
         LEFT JOIN partners p ON p.id = i.partner_id
         LEFT JOIN case_files f ON f.id = i.case_file_id
-        WHERE date(i.issue_date) BETWEEN date(?) AND date(?)${sc.ownMoney()}
+        WHERE i.deleted_at IS NULL
+          AND date(i.issue_date) BETWEEN date(?) AND date(?)${sc.ownMoney()}
         ORDER BY i.issue_date DESC, i.id DESC
       `).all(from, to).map((r) => [r.invoice_no, r.issue_date, r.billed_to || '—',
         r.total.toFixed(2), r.paid.toFixed(2), (r.total - r.paid).toFixed(2), r.status]),
@@ -209,7 +230,7 @@ const REPORTS = {
       LEFT JOIN customers c ON c.id = i.customer_id
       LEFT JOIN partners p ON p.id = i.partner_id
       LEFT JOIN case_files f ON f.id = i.case_file_id
-      WHERE i.status IN ('Unpaid','Partial Paid')${sc.ownMoney()}
+      WHERE i.deleted_at IS NULL AND i.status IN ('Unpaid','Partial Paid')${sc.ownMoney()}
       ORDER BY COALESCE(i.due_date, i.issue_date)
     `).all().map((r) => [r.invoice_no, r.billed_to || '—', r.issue_date, r.due_date || '—',
       r.total.toFixed(2), r.paid.toFixed(2), (r.total - r.paid).toFixed(2), r.status]),
@@ -223,7 +244,7 @@ const REPORTS = {
       rows: db.prepare(`
         SELECT date(pay.paid_at) d, COUNT(*) n, COALESCE(SUM(pay.amount),0) total
         FROM payments pay
-        JOIN invoices i ON i.id = pay.invoice_id
+        JOIN invoices i ON i.id = pay.invoice_id AND i.deleted_at IS NULL
         LEFT JOIN customers c ON c.id = i.customer_id
         LEFT JOIN case_files f ON f.id = i.case_file_id
         WHERE date(pay.paid_at) BETWEEN date(?) AND date(?)${sc.ownCollection()}
@@ -248,11 +269,13 @@ const REPORTS = {
           AND f.due_at < datetime('now','localtime')) overdue,
         (SELECT COUNT(*) FROM meetings m WHERE m.assigned_to = u.id
           AND date(m.meeting_at) BETWEEN date(@from) AND date(@to)) meetings,
-        (SELECT COUNT(*) FROM case_files f WHERE f.created_by = u.id
+        (SELECT COUNT(*) FROM case_files f WHERE f.deleted_at IS NULL AND f.created_by = u.id
           AND date(f.created_at) BETWEEN date(@from) AND date(@to)) files,
-        (SELECT COUNT(*) FROM case_files f WHERE f.assigned_to = u.id AND f.status = 'Approved') approved,
-        (SELECT COUNT(*) FROM case_files f WHERE f.assigned_to = u.id AND f.status = 'Rejected') rejected,
-        (SELECT COALESCE(SUM(i.total),0) FROM invoices i WHERE i.created_by = u.id
+        (SELECT COUNT(*) FROM case_files f WHERE f.deleted_at IS NULL
+           AND f.assigned_to = u.id AND f.status = 'Approved') approved,
+        (SELECT COUNT(*) FROM case_files f WHERE f.deleted_at IS NULL
+           AND f.assigned_to = u.id AND f.status = 'Rejected') rejected,
+        (SELECT COALESCE(SUM(i.total),0) FROM invoices i WHERE i.deleted_at IS NULL AND i.created_by = u.id
           AND i.status != 'Cancelled' AND date(i.issue_date) BETWEEN date(@from) AND date(@to)) revenue
       FROM users u WHERE u.active = 1 AND u.role != 'partner'
       ORDER BY converted DESC, leads DESC
@@ -288,6 +311,29 @@ function scopeFor(user) {
   };
 }
 
+/**
+ * How many rows a report will hand back.
+ *
+ * The detail reports had no limit at all: at ten thousand invoices one returned
+ * 877 KB and the browser spent eight seconds building ten thousand table rows.
+ * The cap keeps the screen usable; the CSV export is raised well above it,
+ * because a spreadsheet is exactly where a long list belongs, and the response
+ * says when rows were left off so nobody reads a truncated total as the whole
+ * picture.
+ */
+const SCREEN_ROW_LIMIT = 500;
+const EXPORT_ROW_LIMIT = 50000;
+
+function capRows(report, limit) {
+  if (!report.rows || report.rows.length <= limit) return report;
+  const total = report.rows.length;
+  return {
+    ...report,
+    rows: report.rows.slice(0, limit),
+    truncated: { shown: limit, total },
+  };
+}
+
 const availableTo = (user) => Object.keys(REPORTS)
   .filter((key) => seesAllWork(user) || !PRIVILEGED_REPORTS.includes(key));
 
@@ -306,7 +352,10 @@ router.get('/:key', wrap((req, res) => {
     throw new HttpError(403, 'Your role does not have access to this report');
   }
   const sc = scopeFor(req.user);
-  res.json({ data: build(req.query, sc), scoped: !sc.allWork || !sc.allMoney });
+  res.json({
+    data: capRows(build(req.query, sc), SCREEN_ROW_LIMIT),
+    scoped: !sc.allWork || !sc.allMoney,
+  });
 }));
 
 /** CSV export of any report, so figures can be handed to an accountant. */
@@ -316,9 +365,18 @@ router.get('/:key/csv', wrap((req, res) => {
   if (!availableTo(req.user).includes(req.params.key)) {
     throw new HttpError(403, 'Your role does not have access to this report');
   }
-  const report = build(req.query, scopeFor(req.user));
+  const report = capRows(build(req.query, scopeFor(req.user)), EXPORT_ROW_LIMIT);
+  /**
+   * Quote for CSV, and defuse spreadsheet formulas.
+   *
+   * A cell starting with = + @ or - is executed by Excel when the file is
+   * opened, so a client name typed as =HYPERLINK(...) would run on the
+   * accountant's machine. Prefixing an apostrophe keeps the text visible and
+   * inert.
+   */
   const escape = (v) => {
-    const s = v === null || v === undefined ? '' : String(v);
+    let s = v === null || v === undefined ? '' : String(v);
+    if (/^[=+@\t\r-]/.test(s)) s = `'${s}`;
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const csv = [report.columns.map(escape).join(','),

@@ -20,7 +20,10 @@ const customerFields = (c = {}) => [
     { name: 'dob', label: 'Date of birth', type: 'date', value: c.dob },
     { name: 'gender', label: 'Gender', type: 'select', options: ['Male', 'Female', 'Other'], value: c.gender },
     { name: 'nationality', label: 'Nationality', value: c.nationality || 'Bangladeshi' },
-    { name: 'passport_no', label: 'Passport number', value: c.passport_no },
+    { name: 'passport_no', label: 'Passport number', value: c.passport_no,
+      hint: 'One passport, one customer — the system will not let two people share a number' },
+    { name: 'passport_expiry', label: 'Passport expiry', type: 'date', value: c.passport_expiry,
+      hint: 'An expired passport is fine to record — it is what you chase' },
     { name: 'nid', label: 'NID number', value: c.nid },
   ] },
   { legend: 'Contact', fields: [
@@ -178,10 +181,10 @@ export async function customerDetailView({ id }) {
     el('div', { class: 'flex' }, [
       el('a', { class: 'btn btn--sm btn--ghost', href: '#/customers', text: '← All customers' }),
       canDelete() ? el('button', {
-        class: 'btn btn--sm btn--ghost', text: 'Delete customer',
+        class: 'btn btn--sm btn--ghost', text: 'Archive',
         onClick: async () => {
-          if (!await confirmDialog(`Delete ${c.full_name}? Their files and documents go with them.`)) return;
-          try { await api.del(`/api/customers/${c.id}`); toast('Customer deleted'); navigate('/customers'); }
+          if (!await confirmDialog(`Archive ${c.full_name}?\n\nTheir case files are archived with them. It stays in the database and an administrator can restore it — it just stops appearing in lists, counts and reports.`)) return;
+          try { await api.del(`/api/customers/${c.id}`); toast('Customer archived'); navigate('/customers'); }
           catch (err) { toastError(err); }
         },
       }) : null,

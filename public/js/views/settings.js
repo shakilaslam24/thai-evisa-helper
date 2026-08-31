@@ -234,7 +234,7 @@ async function usersPanel() {
             onClick: () => formModal({
               title: `Reset password — ${u.name}`,
               fields: [{ name: 'password', label: 'New password', type: 'password', required: true,
-                hint: 'At least 8 characters. The user is signed out of all devices.' }],
+                hint: 'At least 10 characters, with a letter and a number. Not their own name or email. They are signed out of every device.' }],
               submitLabel: 'Reset password',
               onSubmit: async (values) => {
                 await api.post(`/api/users/${u.id}/reset-password`, values);
@@ -295,7 +295,7 @@ function userForm(user, onDone) {
       { name: 'partner_id', label: 'Linked B2B partner', type: 'select', options: partnerOptions(),
         value: user?.partner_id, hint: 'Required only for a B2B partner login' },
       !editing ? { name: 'password', label: 'Password', type: 'password', required: true,
-        hint: 'At least 8 characters' } : null,
+        hint: 'At least 10 characters, with a letter and a number. Not their name or email.' } : null,
       editing ? { name: 'active', label: 'Account status', type: 'select', required: true,
         options: [{ value: '1', label: 'Active' }, { value: '0', label: 'Inactive' }],
         value: user.active ? '1' : '0' } : null,

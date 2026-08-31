@@ -11,6 +11,11 @@
  * the file, because a plain copy taken while the server is running can produce
  * an unusable database. Uploaded documents are mirrored incrementally — they are
  * never modified once written, so only new files are copied each run.
+ *
+ * A restore puts BOTH back. Restoring only the database used to look like a
+ * success and quietly leave every passport scan deleted since the backup
+ * missing: the Documents list showed the rows, and every download answered
+ * "the stored file is no longer available".
  */
 const fs = require('fs');
 const path = require('path');
@@ -159,9 +164,62 @@ function runRestore(args) {
   // WAL side-files belong to the old database and must not outlive it.
   for (const suffix of ['-wal', '-shm']) fs.rmSync(live + suffix, { force: true });
   fs.copyFileSync(path.join(DB_DIR, chosen.name), live);
-
   console.log(`Restored ${chosen.name}`);
+
+  const documents = restoreUploads();
+  if (documents.restored) {
+    console.log(`Restored ${documents.restored} document file(s) (${mb(documents.bytes)})`);
+  } else if (documents.available === 0) {
+    console.log('No mirrored documents to restore.');
+  } else {
+    console.log(`All ${documents.available} document file(s) were already in place.`);
+  }
+  if (documents.missing.length) {
+    console.log(`\n  WARNING: ${documents.missing.length} document(s) referenced by the restored`);
+    console.log('  database are not in the backup mirror either:');
+    for (const m of documents.missing.slice(0, 5)) console.log(`    ${m}`);
+    console.log('  Those uploads were lost before the backup was taken.');
+  }
+
   console.log('\nStart the system again:  npm start\n');
+}
+
+/**
+ * Copies mirrored uploads back beside the restored database.
+ *
+ * Only files that are missing are copied, and nothing already in the upload
+ * directory is overwritten — a document uploaded after the backup keeps its
+ * bytes even though its database row has just been rolled away.
+ */
+function restoreUploads() {
+  const result = { restored: 0, bytes: 0, available: 0, missing: [] };
+  if (!fs.existsSync(FILES_DIR)) return result;
+  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
+  const mirrored = new Set(fs.readdirSync(FILES_DIR));
+  result.available = mirrored.size;
+  for (const name of mirrored) {
+    const to = path.join(UPLOAD_DIR, name);
+    if (fs.existsSync(to)) continue;
+    fs.copyFileSync(path.join(FILES_DIR, name), to);
+    result.restored += 1;
+    result.bytes += fs.statSync(to).size;
+  }
+
+  // Tell the operator plainly if the restored database expects files that are
+  // in neither place, rather than letting them find out one download at a time.
+  try {
+    const Database = require('better-sqlite3');
+    const restored = new Database(path.join(DATA_DIR, 'dreamfly.db'), { readonly: true });
+    const rows = restored.prepare('SELECT stored_name, original_name FROM documents').all();
+    for (const r of rows) {
+      if (!fs.existsSync(path.join(UPLOAD_DIR, r.stored_name))) {
+        result.missing.push(`${r.original_name} (${r.stored_name})`);
+      }
+    }
+    restored.close();
+  } catch { /* the check is a courtesy; a restore that worked still worked */ }
+  return result;
 }
 
 async function main() {

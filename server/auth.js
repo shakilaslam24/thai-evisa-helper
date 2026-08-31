@@ -56,7 +56,26 @@ function readCookies(req) {
   return out;
 }
 
-function setSessionCookie(res, token, expires) {
+/**
+ * Whether this request arrived over HTTPS.
+ *
+ * req.secure is only meaningful when Express is told to trust the proxy, so the
+ * forwarded header is checked directly as well — a reverse proxy that terminates
+ * TLS is the normal deployment here.
+ */
+const isHttps = (req) => Boolean(
+  req.secure
+  || req.get('X-Forwarded-Proto') === 'https'
+  || process.env.FORCE_SECURE_COOKIES === '1'
+);
+
+/**
+ * Secure is set whenever the request itself came over HTTPS, rather than only
+ * when NODE_ENV happens to say "production". Relying on an environment variable
+ * meant a server started with the documented `npm start` handed out cookies that
+ * a network could read; now the connection decides.
+ */
+function setSessionCookie(req, res, token, expires) {
   const bits = [
     `${SESSION_COOKIE}=${token}`,
     'Path=/',
@@ -64,7 +83,7 @@ function setSessionCookie(res, token, expires) {
     'SameSite=Lax',
     `Expires=${new Date(expires).toUTCString()}`,
   ];
-  if (process.env.NODE_ENV === 'production') bits.push('Secure');
+  if (isHttps(req) || process.env.NODE_ENV === 'production') bits.push('Secure');
   res.append('Set-Cookie', bits.join('; '));
 }
 
@@ -131,6 +150,6 @@ function canWrite(moduleName) {
 module.exports = {
   SESSION_COOKIE, hashPassword, verifyPassword, createSession, destroySession,
   purgeExpiredSessions, readCookies, setSessionCookie, clearSessionCookie,
-  loadUser, requireAuth, requireRole, canWrite, denyPartner,
+  loadUser, requireAuth, requireRole, canWrite, denyPartner, isHttps,
   seesAllWork, seesAllMoney,
 };

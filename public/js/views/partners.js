@@ -3,7 +3,7 @@ import {
   formModal, confirmDialog, initials,
 } from '../ui.js';
 import { api, qs } from '../api.js';
-import { store, can } from '../store.js';
+import { store, can, canDelete } from '../store.js';
 import { navigate } from '../router.js';
 import { refreshPartners } from '../store.js';
 import {
@@ -209,14 +209,14 @@ export async function partnerDetailView({ id }) {
   return el('div', { class: 'stack' }, [
     el('div', { class: 'flex' }, [
       el('a', { class: 'btn btn--sm btn--ghost', href: '#/partners', text: '← All partners' }),
-      editable ? el('button', {
-        class: 'btn btn--sm btn--ghost', text: 'Delete partner',
+      canDelete() ? el('button', {
+        class: 'btn btn--sm btn--ghost', text: 'Archive',
         onClick: async () => {
-          if (!await confirmDialog(`Delete partner "${p.partner_name}"? Their files stay but lose the partner link.`)) return;
+          if (!await confirmDialog(`Archive partner "${p.partner_name}"?\n\nTheir files, customers and invoices keep the partner link, and their login is switched off. It stays in the database and an administrator can restore it — it just stops appearing in lists, counts and reports.`)) return;
           try {
             await api.del(`/api/partners/${p.id}`);
             await refreshPartners();
-            toast('Partner deleted'); navigate('/partners');
+            toast('Partner archived'); navigate('/partners');
           } catch (err) { toastError(err); }
         },
       }) : null,

@@ -28,6 +28,15 @@ function sweepFollowups() {
       , (SELECT name FROM users WHERE id = f.assigned_to) AS assigned_name
     FROM followups f
     WHERE f.status = 'Pending' AND f.due_at <= datetime('now','localtime')
+      AND NOT EXISTS (
+        SELECT 1 FROM leads x      WHERE f.entity_type = 'lead'      AND x.id = f.entity_id AND x.deleted_at IS NOT NULL
+        UNION ALL
+        SELECT 1 FROM customers x  WHERE f.entity_type = 'customer'  AND x.id = f.entity_id AND x.deleted_at IS NOT NULL
+        UNION ALL
+        SELECT 1 FROM partners x   WHERE f.entity_type = 'partner'   AND x.id = f.entity_id AND x.deleted_at IS NOT NULL
+        UNION ALL
+        SELECT 1 FROM case_files x WHERE f.entity_type = 'case_file' AND x.id = f.entity_id AND x.deleted_at IS NOT NULL
+      )
   `).all();
 
   const today = new Date().toISOString().slice(0, 10);
@@ -96,7 +105,7 @@ function sweepInterviews() {
     SELECT f.id, f.reference_no, f.interview_date, f.assigned_to,
            trim(c.given_name || ' ' || COALESCE(c.surname,'')) AS customer_name
     FROM case_files f LEFT JOIN customers c ON c.id = f.customer_id
-    WHERE f.interview_date IS NOT NULL
+    WHERE f.deleted_at IS NULL AND f.interview_date IS NOT NULL
       AND date(f.interview_date) BETWEEN date('now','localtime') AND date('now','localtime','+3 days')
       AND f.status NOT IN ('Approved','Rejected','Delivered','Completed')
   `).all();
@@ -121,7 +130,7 @@ function sweepPaymentDues() {
     FROM invoices i
     LEFT JOIN customers c ON c.id = i.customer_id
     LEFT JOIN partners p ON p.id = i.partner_id
-    WHERE i.status IN ('Unpaid','Partial Paid')
+    WHERE i.deleted_at IS NULL AND i.status IN ('Unpaid','Partial Paid')
       AND i.due_date IS NOT NULL AND date(i.due_date) <= date('now','localtime')
   `).all();
 
@@ -148,7 +157,7 @@ function sweepMissingDocuments() {
     SELECT f.id, f.reference_no, f.assigned_to, COUNT(dc.id) AS missing
     FROM case_files f
     JOIN document_checklist dc ON dc.case_file_id = f.id AND dc.status = 'Missing'
-    WHERE f.status IN ('Ready for Submission','Submitted','Documents Pending','Additional Documents Required')
+    WHERE f.deleted_at IS NULL AND f.status IN ('Ready for Submission','Submitted','Documents Pending','Additional Documents Required')
     GROUP BY f.id
   `).all();
 

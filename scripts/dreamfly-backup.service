@@ -1,0 +1,11 @@
+# Runs one backup. Triggered by dreamfly-backup.timer, not enabled on its own.
+[Unit]
+Description=DreamFly CRM backup
+After=dreamfly.service
+
+[Service]
+Type=oneshot
+User=dreamfly
+WorkingDirectory=/opt/dreamfly
+EnvironmentFile=/opt/dreamfly/.env
+ExecStart=/usr/bin/npm run --silent backup

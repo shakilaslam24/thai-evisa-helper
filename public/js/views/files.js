@@ -109,12 +109,24 @@ export async function fileDetailView({ id }) {
   const editable = can('files');
   const refresh = () => window.dispatchEvent(new HashChangeEvent('hashchange'));
 
+  const CLOSED_STATUSES = ['Approved', 'Rejected', 'Delivered', 'Completed'];
+
   const statusSelect = el('select', {},
     store.enums.file_statuses.map((s) => el('option', { value: s, text: s, selected: s === f.status })));
   statusSelect.addEventListener('change', async () => {
+    const next = statusSelect.value;
+    // Moving a finished file back into progress is asked about first — a
+    // mis-click here changes what the client sees on the tracking page.
+    const reopening = CLOSED_STATUSES.includes(f.status) && !CLOSED_STATUSES.includes(next);
+    if (reopening && !await confirmDialog(
+      `This file is marked ${f.status}. Reopen it as "${next}"?\n\n`
+      + 'The completion date will be cleared, and the client sees the new status '
+      + 'on the tracking page.',
+      { title: 'Reopen this file?' },
+    )) { statusSelect.value = f.status; return; }
     try {
-      await api.patch(`/api/files/${f.id}/status`, { status: statusSelect.value });
-      toast(`File status set to ${statusSelect.value}`);
+      await api.patch(`/api/files/${f.id}/status`, { status: next, reopen: reopening });
+      toast(reopening ? `File reopened as ${next}` : `File status set to ${next}`);
       refresh();
     } catch (err) { toastError(err); statusSelect.value = f.status; }
   });
@@ -214,10 +226,10 @@ export async function fileDetailView({ id }) {
     el('div', { class: 'flex' }, [
       el('a', { class: 'btn btn--sm btn--ghost', href: '#/files', text: '← All files' }),
       canDelete() ? el('button', {
-        class: 'btn btn--sm btn--ghost', text: 'Delete file',
+        class: 'btn btn--sm btn--ghost', text: 'Archive',
         onClick: async () => {
-          if (!await confirmDialog(`Delete file ${f.reference_no}? This cannot be undone.`)) return;
-          try { await api.del(`/api/files/${f.id}`); toast('File deleted'); navigate('/files'); }
+          if (!await confirmDialog(`Archive file ${f.reference_no}?\n\nIt stays in the database and an administrator can restore it — it just stops appearing in lists, counts and reports.`)) return;
+          try { await api.del(`/api/files/${f.id}`); toast('File archived'); navigate('/files'); }
           catch (err) { toastError(err); }
         },
       }) : null,

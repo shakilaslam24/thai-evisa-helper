@@ -35,6 +35,18 @@ const SELECT = `
 router.get('/', wrap((req, res) => {
   const q = req.query;
   const w = conditions();
+  // Items whose lead, customer, file or partner has been archived drop out of
+  // the working lists with it — otherwise they keep raising reminders under a
+  // name nobody can open.
+  w.add(`NOT EXISTS (
+    SELECT 1 FROM leads x      WHERE f.entity_type = 'lead'      AND x.id = f.entity_id AND x.deleted_at IS NOT NULL
+    UNION ALL
+    SELECT 1 FROM customers x  WHERE f.entity_type = 'customer'  AND x.id = f.entity_id AND x.deleted_at IS NOT NULL
+    UNION ALL
+    SELECT 1 FROM partners x   WHERE f.entity_type = 'partner'   AND x.id = f.entity_id AND x.deleted_at IS NOT NULL
+    UNION ALL
+    SELECT 1 FROM case_files x WHERE f.entity_type = 'case_file' AND x.id = f.entity_id AND x.deleted_at IS NOT NULL
+  )`);
   w.addIf(q.status, 'f.status = ?');
   w.addIf(q.assigned_to, 'f.assigned_to = ?', Number(q.assigned_to));
   w.addIf(q.entity_type, 'f.entity_type = ?');

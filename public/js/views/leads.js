@@ -3,7 +3,7 @@ import {
   confirmDialog, toInputDateTime, toSqlDateTime, initials,
 } from '../ui.js';
 import { api, qs } from '../api.js';
-import { store, can, listValues } from '../store.js';
+import { store, can, canDelete, listValues } from '../store.js';
 import { navigate } from '../router.js';
 import {
   listPage, pageHead, staffOptions, countryOptions, serviceOptions, sourceOptions,
@@ -196,11 +196,11 @@ export async function leadDetailView({ id }) {
   return el('div', { class: 'stack' }, [
     el('div', { class: 'flex' }, [
       el('a', { class: 'btn btn--sm btn--ghost', href: '#/leads', text: '← All leads' }),
-      editable ? el('button', {
-        class: 'btn btn--sm btn--ghost', text: 'Delete lead',
+      canDelete() ? el('button', {
+        class: 'btn btn--sm btn--ghost', text: 'Archive',
         onClick: async () => {
-          if (!await confirmDialog(`Delete lead "${lead.full_name}"? This cannot be undone.`)) return;
-          try { await api.del(`/api/leads/${lead.id}`); toast('Lead deleted'); navigate('/leads'); }
+          if (!await confirmDialog(`Archive lead "${lead.full_name}"?\n\nAny open follow-ups and meetings for them are cancelled. It stays in the database and an administrator can restore it — it just stops appearing in lists, counts and reports.`)) return;
+          try { await api.del(`/api/leads/${lead.id}`); toast('Lead archived'); navigate('/leads'); }
           catch (err) { toastError(err); }
         },
       }) : null,

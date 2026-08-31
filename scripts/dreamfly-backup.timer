@@ -1,0 +1,18 @@
+# Backs up every night at 2am, and catches up if the server was off.
+#
+#   sudo cp scripts/dreamfly-backup.* /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now dreamfly-backup.timer
+#
+# Check when it last ran:  systemctl list-timers dreamfly-backup
+
+[Unit]
+Description=Nightly DreamFly CRM backup
+
+[Timer]
+OnCalendar=*-*-* 02:00:00
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

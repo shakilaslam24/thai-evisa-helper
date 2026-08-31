@@ -3,10 +3,16 @@ import {
   confirmDialog, modal, closeModal, clear, statCard, field,
 } from '../ui.js';
 import { api, qs } from '../api.js';
-import { store, can } from '../store.js';
+import { store, can, canDelete, listValues } from '../store.js';
 import { navigate } from '../router.js';
 import { listPage, partnerOptions, customerPicker, trackingUrl } from './common.js';
 import { qrSvg } from '../qr.js';
+
+/** Today on the browser's clock, for date fields that default to now. */
+const todayISO = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 
 /* ------------------------------ invoice form ------------------------------ */
 
@@ -418,24 +424,62 @@ export async function invoiceDetailView({ id }) {
 
   // Internal record — the invoice a client receives shows Paid and Balance due,
   // not the office's payment log or its buttons.
-  const paymentsCard = card('Payments received', table({
+  // Money that came in and money that went back, in one list. A refund is its
+  // own row rather than an edit of the original, so the history reads as what
+  // actually happened.
+  const paymentsCard = card('Payments and refunds', table({
     columns: [
       { label: 'Date', render: (p) => fmtDate(p.paid_at) },
       { label: 'Method', render: (p) => p.method },
       { label: 'Reference', render: (p) => p.reference || '—' },
-      { label: 'Note', render: (p) => p.note || '—' },
-      { label: 'Received by', render: (p) => p.received_by_name || '—' },
-      { label: 'Amount', align: 'right', render: (p) => money(p.amount, inv.currency) },
-      { label: '', align: 'right', render: (p) => (can('payments') ? el('button', {
-        class: 'btn btn--sm btn--danger', text: 'Remove',
-        onClick: async () => {
-          if (!await confirmDialog('Remove this payment record?')) return;
-          try { await api.del(`/api/payments/${p.id}`); toast('Payment removed'); refresh(); }
-          catch (err) { toastError(err); }
-        },
-      }) : null) },
+      {
+        label: 'Note',
+        render: (p) => (p.reversal_of
+          ? el('div', {}, [
+            el('span', { class: 'badge badge--warn', text: 'Refund' }),
+            el('div', { class: 'cell-sub', text: p.reason || p.note || '' }),
+          ])
+          : (p.note || '—')),
+      },
+      { label: 'Recorded by', render: (p) => p.received_by_name || '—' },
+      {
+        label: 'Amount',
+        align: 'right',
+        render: (p) => el('span', { style: p.amount < 0 ? 'color:var(--danger-fg)' : null,
+          text: money(p.amount, inv.currency) }),
+      },
+      {
+        label: '',
+        align: 'right',
+        render: (p) => el('div', { class: 'row-actions' }, [
+          // Anyone on the team can send money back; that is ordinary business.
+          can('payments') && !p.reversal_of && p.refundable > 0.001 ? el('button', {
+            class: 'btn btn--sm', text: 'Refund',
+            onClick: () => refundForm(p, inv, refresh),
+          }) : null,
+          // Deleting the record itself is an administrator correcting a typo.
+          canDelete() ? el('button', {
+            class: 'btn btn--sm btn--danger', text: 'Delete',
+            title: 'Removes the record entirely — use Refund to return money',
+            onClick: async () => {
+              if (!await confirmDialog(
+                `Delete this ${money(p.amount, inv.currency)} record?\n\n`
+                + 'This is for correcting a mis-typed entry. To return money to a client, '
+                + 'use Refund instead so the original receipt stays on the books.',
+              )) return;
+              try { await api.del(`/api/payments/${p.id}`); toast('Payment record deleted'); refresh(); }
+              catch (err) { toastError(err); }
+            },
+          }) : null,
+        ]),
+      },
     ],
-    rows: res.payments,
+    rows: res.payments.map((p) => ({
+      ...p,
+      refundable: p.amount - res.payments
+        .filter((r) => r.reversal_of === p.id)
+        .reduce((sum, r) => sum - r.amount, 0),
+    })),
     empty: 'No payment received yet',
     emptyIcon: '৳',
   }), { flush: true, actions: can('payments') && due > 0.001 ? el('button', {
@@ -465,6 +509,17 @@ export async function invoiceDetailView({ id }) {
           invoiceForm({ ...full.data, items: full.items }, refresh);
         },
       }) : null,
+      canDelete() && inv.paid === 0 ? el('button', {
+        class: 'btn btn--sm btn--danger', text: 'Archive',
+        title: 'Takes the invoice out of every list and total. An administrator can restore it.',
+        onClick: async () => {
+          if (!await confirmDialog(`Archive invoice ${inv.invoice_no}?\n\n`
+            + 'It stays in the database and can be restored — it just stops appearing in '
+            + 'lists, totals and reports.')) return;
+          try { await api.del(`/api/invoices/${inv.id}`); toast('Invoice archived'); navigate('/invoices'); }
+          catch (err) { toastError(err); }
+        },
+      }) : null,
       can('invoices') && inv.status !== 'Cancelled' && inv.paid === 0 ? el('button', {
         class: 'btn btn--sm btn--danger', text: 'Cancel invoice',
         onClick: async () => {
@@ -485,7 +540,41 @@ function totalRow(label, value, grand) {
   ]);
 }
 
-export function paymentForm(invoice, onDone) {
+export /**
+ * Sending money back.
+ *
+ * The reason is required because it is the only thing that later distinguishes a
+ * cancelled trip from a mistake, and because the refund row is permanent — it is
+ * not an edit of the receipt, it sits beside it.
+ */
+function refundForm(payment, invoice, onDone) {
+  formModal({
+    title: `Refund — ${invoice.invoice_no}`,
+    submitLabel: 'Issue refund',
+    fields: [
+      { name: 'amount', label: `Amount to return (${invoice.currency})`, type: 'number',
+        step: '0.01', min: '0.01', value: payment.refundable, required: true,
+        hint: `Up to ${money(payment.refundable, invoice.currency)} of the `
+          + `${money(payment.amount, invoice.currency)} taken on ${fmtDate(payment.paid_at)}` },
+      { name: 'method', label: 'Returned by', type: 'select', required: true,
+        options: listValues('payment_method'), value: payment.method },
+      { name: 'refunded_at', label: 'Refund date', type: 'date', value: todayISO(), required: true },
+      { name: 'reference', label: 'Transaction reference', span: true },
+      { name: 'reason', label: 'Why is this being refunded?', type: 'textarea', span: true, required: true,
+        hint: 'Goes on the permanent record — e.g. "Trip cancelled by client", "Visa rejected, fee returned"' },
+    ],
+    onSubmit: async (values) => {
+      await api.post(`/api/payments/${payment.id}/refund`, values);
+      toast('Refund recorded');
+      onDone();
+    },
+  });
+}
+
+function paymentForm(invoice, onDone) {
+  // Made once, when the form opens. A double-clicked submit carries the same key
+  // and the server books the payment once; opening the form again makes a new one.
+  const submissionKey = `pay-${invoice.id}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   const outstanding = Math.round((invoice.total - invoice.paid) * 100) / 100;
   formModal({
     title: `Record payment — ${invoice.invoice_no}`,
@@ -504,7 +593,9 @@ export function paymentForm(invoice, onDone) {
     ],
     submitLabel: 'Save payment',
     onSubmit: async (values) => {
-      await api.post('/api/payments', { ...values, invoice_id: invoice.id });
+      await api.post('/api/payments', {
+        ...values, invoice_id: invoice.id, idempotency_key: submissionKey,
+      });
       toast('Payment recorded');
       onDone();
     },
