@@ -1,0 +1,603 @@
+import {
+  el, card, badge, table, fmtDate, fmtDateTime, money, toast, toastError, formModal,
+  confirmDialog, modal, closeModal, clear, statCard, field,
+} from '../ui.js';
+import { api, qs } from '../api.js';
+import { store, can, canDelete, listValues } from '../store.js';
+import { navigate } from '../router.js';
+import { listPage, partnerOptions, customerPicker, trackingUrl } from './common.js';
+import { qrSvg } from '../qr.js';
+
+/** Today on the browser's clock, for date fields that default to now. */
+const todayISO = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+/* ------------------------------ invoice form ------------------------------ */
+
+function itemRow(item = {}, onChange) {
+  const description = el('input', { placeholder: 'Service description', value: item.description || '' });
+  const quantity = el('input', { type: 'number', step: '0.01', min: '0', value: item.quantity ?? 1, style: 'max-width:90px' });
+  const price = el('input', { type: 'number', step: '0.01', min: '0', value: item.unit_price ?? '', style: 'max-width:130px' });
+  const amount = el('div', { class: 'mono nowrap', style: 'min-width:90px;text-align:right' });
+
+  const recalc = () => {
+    const total = (Number(quantity.value) || 0) * (Number(price.value) || 0);
+    amount.textContent = total.toFixed(2);
+    onChange();
+  };
+  [quantity, price].forEach((i) => i.addEventListener('input', recalc));
+  description.addEventListener('input', onChange);
+
+  const row = el('div', { class: 'flex', style: 'align-items:flex-end;gap:8px;margin-bottom:8px' }, [
+    el('div', { class: 'field', style: 'flex:1;min-width:160px' }, [description]),
+    el('div', { class: 'field' }, [quantity]),
+    el('div', { class: 'field' }, [price]),
+    amount,
+    el('button', {
+      class: 'btn btn--sm btn--ghost', type: 'button', text: '✕', title: 'Remove line',
+      onClick: () => { row.remove(); onChange(); },
+    }),
+  ]);
+  row._read = () => ({
+    description: description.value.trim(),
+    quantity: Number(quantity.value) || 0,
+    unit_price: Number(price.value) || 0,
+  });
+  recalc();
+  return row;
+}
+
+export function invoiceForm(invoice, onDone, { customer, partner, file } = {}) {
+  const editing = Boolean(invoice?.id);
+  const itemsHost = el('div');
+  const discountInput = el('input', { type: 'number', step: '0.01', min: '0', name: 'discount', value: invoice?.discount ?? 0 });
+  const taxInput = el('input', { type: 'number', step: '0.01', min: '0', name: 'tax', value: invoice?.tax ?? 0 });
+  const totalsBox = el('div', { class: 'invoice-totals' });
+
+  const readItems = () => Array.from(itemsHost.children).map((r) => r._read()).filter((i) => i.description);
+
+  function recalcTotals() {
+    const items = readItems();
+    const subtotal = items.reduce((s, i) => s + i.quantity * i.unit_price, 0);
+    const discount = Number(discountInput.value) || 0;
+    const tax = Number(taxInput.value) || 0;
+    const currency = store.settings.invoice_currency || 'BDT';
+    clear(totalsBox).append(
+      row('Subtotal', money(subtotal, currency)),
+      row('Discount', `− ${money(discount, currency)}`),
+      row('Tax / VAT', money(tax, currency)),
+      row('Total', money(Math.max(subtotal - discount + tax, 0), currency), true),
+    );
+  }
+  const row = (label, value, grand) => el('div', {
+    class: `invoice-totals__row${grand ? ' invoice-totals__row--grand' : ''}`,
+  }, [el('span', { text: label }), el('span', { class: 'mono', text: value })]);
+
+  const addLine = (item) => { itemsHost.append(itemRow(item, recalcTotals)); recalcTotals(); };
+  ((invoice?.items?.length ? invoice.items : [{}])).forEach(addLine);
+  [discountInput, taxInput].forEach((i) => i.addEventListener('input', recalcTotals));
+
+  /* ------------------------------- bill to -------------------------------
+   * Opened from a customer, partner or file profile, the other party is
+   * already known and is simply stated. Opened from the Invoices page there is
+   * no context, so both a customer search and a partner list are offered.
+   */
+  const known = customer || invoice?.customer_id || file?.customer_id
+    ? {
+      type: 'customer',
+      id: customer?.id ?? invoice?.customer_id ?? file?.customer_id,
+      label: customer?.full_name ?? invoice?.customer_name ?? file?.customer_name,
+    }
+    : partner || invoice?.partner_id
+      ? {
+        type: 'partner',
+        id: partner?.id ?? invoice?.partner_id,
+        label: partner?.partner_name ?? invoice?.partner_name,
+      }
+      : null;
+
+  // Case file to attach, so payments roll up to the file's payment status.
+  let chosenFileId = file?.id ?? invoice?.case_file_id ?? null;
+  const fileSelect = el('select', { name: 'case_file_id' },
+    [el('option', { value: '', text: '— not linked to a file —' })]);
+  const fileField = el('div', { class: 'field span-2', hidden: true }, [
+    el('label', { text: 'Link to a file (optional)' }),
+    fileSelect,
+    el('div', { class: 'field__hint', text: 'Linking keeps the file’s payment status in step with this invoice' }),
+  ]);
+  fileSelect.addEventListener('change', () => { chosenFileId = fileSelect.value || null; });
+
+  /** Offer that customer's files once one is chosen. */
+  async function loadFilesFor(customerId) {
+    fileField.hidden = true;
+    if (!customerId) return;
+    try {
+      const res = await api.get(`/api/files${qs({ limit: 50 })}`);
+      const mine = res.data.filter((f) => String(f.customer_id) === String(customerId));
+      if (!mine.length) return;
+      clear(fileSelect).append(el('option', { value: '', text: '— not linked to a file —' }));
+      for (const f of mine) {
+        fileSelect.append(el('option', {
+          value: f.id,
+          text: `${f.reference_no || `File #${f.id}`} · ${f.service_type || ''} ${f.country || ''}`.trim(),
+          selected: String(f.id) === String(chosenFileId),
+        }));
+      }
+      fileField.hidden = false;
+    } catch { /* the link is optional; a failure must not block invoicing */ }
+  }
+
+  const picker = customerPicker({
+    label: 'Bill to customer', required: true,
+    onSelect: (c) => { chosenFileId = null; loadFilesFor(c?.id); },
+  });
+
+  const partnerSelect = field({
+    name: 'partner_id', label: 'Bill to B2B partner', type: 'select',
+    options: partnerOptions(), value: known?.type === 'partner' ? known.id : '',
+    blank: '— choose a partner —',
+  });
+
+  // Switch between the two, defaulting to a direct customer.
+  let billToType = known?.type || 'customer';
+  const customerPane = el('div', {}, [picker, fileField]);
+  const partnerPane = el('div', { hidden: true }, partnerSelect);
+
+  const showPane = () => {
+    customerPane.hidden = billToType !== 'customer';
+    partnerPane.hidden = billToType !== 'partner';
+    for (const b of tabs.children) b.classList.toggle('btn--primary', b.dataset.type === billToType);
+  };
+  const tabs = el('div', { class: 'flex', style: 'margin-bottom:10px' }, [
+    ['customer', 'Direct customer'], ['partner', 'B2B partner'],
+  ].map(([type, label]) => el('button', {
+    class: 'btn btn--sm', type: 'button', dataset: { type }, text: label,
+    onClick: () => { billToType = type; showPane(); },
+  })));
+
+  const billToBlock = known
+    ? el('div', { class: 'field span-2' }, [
+      el('label', { text: known.type === 'partner' ? 'Bill to B2B partner' : 'Bill to customer' }),
+      el('div', { style: 'font-weight:650', text: known.label || `#${known.id}` }),
+    ])
+    : el('fieldset', { class: 'section' }, [
+      el('legend', { text: 'Bill to' }), tabs, customerPane, partnerPane,
+    ]);
+  if (!known) showPane();
+  if (known?.type === 'customer') loadFilesFor(known.id);
+
+  const extra = el('div', { class: 'stack' }, [
+    el('fieldset', { class: 'section' }, [
+      el('legend', { text: 'Line items' }),
+      el('div', { class: 'flex small faint', style: 'gap:8px' }, [
+        el('div', { style: 'flex:1;min-width:160px', text: 'Description' }),
+        el('div', { style: 'width:90px', text: 'Qty' }),
+        el('div', { style: 'width:130px', text: 'Unit price' }),
+        el('div', { style: 'min-width:90px;text-align:right', text: 'Amount' }),
+        el('div', { style: 'width:34px' }),
+      ]),
+      itemsHost,
+      el('button', { class: 'btn btn--sm', type: 'button', text: '+ Add line', onClick: () => addLine({}) }),
+    ]),
+    el('div', { class: 'form-grid' }, [
+      el('div', { class: 'field' }, [el('label', { text: 'Discount' }), discountInput]),
+      el('div', { class: 'field' }, [el('label', { text: 'Tax / VAT' }), taxInput]),
+    ]),
+    totalsBox,
+  ]);
+
+  formModal({
+    title: editing ? `Edit invoice ${invoice.invoice_no}` : 'Create invoice',
+    wide: true,
+    fields: [
+      billToBlock,
+      { legend: 'Invoice', fields: [
+        { name: 'issue_date', label: 'Invoice date', type: 'date', required: true,
+          value: invoice?.issue_date || new Date().toISOString().slice(0, 10) },
+        { name: 'due_date', label: 'Payment due date', type: 'date', value: invoice?.due_date },
+        { name: 'currency', label: 'Currency', value: invoice?.currency || store.settings.invoice_currency || 'BDT' },
+      ] },
+      { name: 'notes', label: 'Notes shown on the invoice', type: 'textarea', value: invoice?.notes },
+    ].filter(Boolean),
+    extra,
+    submitLabel: editing ? 'Save invoice' : 'Create invoice',
+    onSubmit: async (values) => {
+      const items = readItems();
+      if (!items.length) throw new Error('Add at least one line item');
+      const asCustomer = known ? known.type === 'customer' : billToType === 'customer';
+      const payload = {
+        ...values,
+        items,
+        customer_id: asCustomer ? (known?.id ?? (values.customer_id || null)) : null,
+        partner_id: asCustomer ? null : (known?.id ?? (values.partner_id || null)),
+        case_file_id: asCustomer ? (chosenFileId || null) : null,
+      };
+      if (asCustomer && !payload.customer_id) {
+        throw new Error('Search for and choose the customer to bill');
+      }
+      if (!asCustomer && !payload.partner_id) {
+        throw new Error('Choose the B2B partner to bill');
+      }
+      const res = editing
+        ? await api.put(`/api/invoices/${invoice.id}`, payload)
+        : await api.post('/api/invoices', payload);
+      toast(editing ? 'Invoice updated' : `Invoice ${res.data.invoice_no} created`);
+      onDone(res.data);
+    },
+  });
+}
+
+/* -------------------------------- list view -------------------------------- */
+
+export default function invoicesView() {
+  const currency = store.settings.invoice_currency || 'BDT';
+  return listPage({
+    title: 'Invoices',
+    subtitle: 'Bills raised to direct customers and B2B partners',
+    endpoint: '/api/invoices',
+    route: 'invoices',
+    searchPlaceholder: 'Search invoice number, customer or partner…',
+    emptyText: 'No invoices match these filters',
+    emptyIcon: '🧾',
+    actions: [can('invoices') ? el('button', {
+      class: 'btn btn--primary', text: '+ Create invoice',
+      onClick: () => invoiceForm(null, (i) => navigate(`/invoices/${i.id}`)),
+    }) : null],
+    filters: [
+      { name: 'status', label: 'Status', type: 'select', options: ['Unpaid', 'Partial Paid', 'Paid', 'Cancelled'] },
+      { name: 'partner_id', label: 'B2B partner', type: 'select', options: partnerOptions() },
+      { name: 'date_from', label: 'From', type: 'date' },
+      { name: 'date_to', label: 'To', type: 'date' },
+    ],
+    summary: (res) => el('div', { class: 'grid grid--stats' }, [
+      statCard({ label: 'Invoices listed', value: res.total }),
+      statCard({ label: 'Total billed', value: money(res.totals.billed, currency) }),
+      statCard({ label: 'Collected', value: money(res.totals.collected, currency), tone: 'ok' }),
+      statCard({ label: 'Outstanding', value: money(res.totals.due, currency), tone: res.totals.due > 0 ? 'alert' : undefined }),
+    ]),
+    onRowClick: (row) => navigate(`/invoices/${row.id}`),
+    columns: [
+      { label: 'Invoice', render: (i) => el('div', {}, [
+        el('div', { class: 'cell-title', text: i.invoice_no }),
+        el('div', { class: 'cell-sub', text: fmtDate(i.issue_date) }),
+      ]) },
+      { label: 'Billed to', render: (i) => el('div', {}, [
+        el('div', { text: i.partner_name || i.customer_name || '—' }),
+        el('div', { class: 'cell-sub', text: i.partner_name ? 'B2B partner' : 'Direct customer' }),
+      ]) },
+      { label: 'File', render: (i) => i.reference_no || '—' },
+      { label: 'Total', align: 'right', render: (i) => money(i.total, i.currency) },
+      { label: 'Paid', align: 'right', render: (i) => money(i.paid, i.currency) },
+      { label: 'Due', align: 'right', render: (i) => (i.due_amount > 0
+        ? el('span', { class: 'badge badge--danger', text: money(i.due_amount, i.currency) })
+        : el('span', { class: 'faint', text: '—' })) },
+      { label: 'Status', render: (i) => badge(i.status) },
+    ],
+  });
+}
+
+/* ------------------------------- detail view ------------------------------- */
+
+/**
+ * The QR code a client scans to follow their own application.
+ *
+ * Error correction is set high enough that the code still reads after being
+ * printed small, folded or photocopied, which is what happens to an invoice.
+ * The link comes from Settings, so moving to a new domain does not mean
+ * reprinting anything that has already gone out — only the next invoice
+ * changes.
+ */
+function trackingBlock(company) {
+  if (String(company.invoice_show_qr ?? '1') === '0') return null;
+  let code;
+  try {
+    code = qrSvg(trackingUrl(company), { size: 92, level: 'Q', margin: 2, dark: '#101F40' });
+  } catch {
+    return null; // never let a bad link stop an invoice from printing
+  }
+  return el('div', { class: 'invoice-track' }, [
+    code,
+    el('div', { class: 'invoice-track__text' }, [
+      el('div', { class: 'invoice-track__title',
+        text: company.invoice_qr_caption || 'Scan to track your application' }),
+      el('div', { class: 'faint small',
+        text: 'Enter your passport number and your name to see the current status.' }),
+    ]),
+  ]);
+}
+
+export async function invoiceDetailView({ id }) {
+  const res = await api.get(`/api/invoices/${id}`);
+  const inv = res.data;
+  const company = res.company;
+  const refresh = () => window.dispatchEvent(new HashChangeEvent('hashchange'));
+  const due = inv.total - inv.paid;
+
+  const billedTo = inv.partner_id
+    ? { name: inv.partner_company || inv.partner_name, extra: [inv.partner_name, inv.partner_address, inv.partner_phone, inv.partner_email] }
+    : { name: inv.customer_name, extra: [inv.customer_address, inv.customer_phone, inv.customer_email] };
+
+  const sheet = el('div', { class: 'invoice-sheet' }, [
+    el('div', { class: 'invoice-sheet__head' }, [
+      (() => {
+        // The lockup already carries the company name, so printing it again as
+        // a heading just repeats itself. Only fall back to text if no logo shows.
+        const logo = el('img', {
+          class: 'invoice-sheet__logo',
+          src: company.company_logo_url || '/assets/brand/logo-wide-dark.png',
+          alt: company.company_name || 'DreamFly Consultancy',
+        });
+        const name = el('div', {
+          class: 'invoice-sheet__title', hidden: true,
+          text: company.company_name || 'DreamFly Consultancy',
+        });
+        logo.addEventListener('error', () => { logo.hidden = true; name.hidden = false; });
+        return el('div', { class: 'invoice-sheet__from' }, [
+          logo,
+          name,
+          el('div', { class: 'muted small' }, [
+            company.company_tagline || '', el('br'),
+            company.company_address || '', el('br'),
+            [company.company_phone, company.company_phone_alt, company.company_phone_alt2]
+              .filter(Boolean).join(' · '), el('br'),
+            [company.company_email, company.company_website].filter(Boolean).join(' · '),
+          ]),
+        ]);
+      })(),
+      el('div', { class: 'invoice-sheet__meta' }, [
+        el('div', { style: 'font-size:22px;font-weight:750;letter-spacing:.08em', text: 'INVOICE' }),
+        el('div', { class: 'mono', style: 'font-size:15px;margin-top:4px', text: inv.invoice_no }),
+        el('div', { class: 'muted small mt-1' }, [
+          `Date: ${fmtDate(inv.issue_date)}`, el('br'),
+          inv.due_date ? `Payment due: ${fmtDate(inv.due_date)}` : '',
+        ]),
+        el('div', { class: 'mt-1' }, badge(inv.status)),
+      ]),
+    ]),
+
+    el('div', { class: 'invoice-sheet__parties' }, [
+      el('div', {}, [
+        el('div', { class: 'kv__label', text: 'Billed to' }),
+        el('div', { style: 'font-weight:650;margin-top:4px', text: billedTo.name || '—' }),
+        el('div', { class: 'muted small' }, billedTo.extra.filter(Boolean).flatMap((x) => [x, el('br')])),
+      ]),
+      inv.reference_no ? el('div', {}, [
+        el('div', { class: 'kv__label', text: 'File reference' }),
+        el('div', { style: 'font-weight:650;margin-top:4px', text: inv.reference_no }),
+      ]) : null,
+    ]),
+
+    el('table', {}, [
+      el('colgroup', {}, [
+        el('col', { class: 'c-num' }), el('col'), el('col', { class: 'c-qty' }),
+        el('col', { class: 'c-price' }), el('col', { class: 'c-amount' }),
+      ]),
+      el('thead', {}, el('tr', {}, [
+        el('th', { text: '#' }), el('th', { text: 'Description' }),
+        el('th', { class: 'num', text: 'Qty' }),
+        el('th', { class: 'num', text: 'Unit price' }),
+        el('th', { class: 'num', text: 'Amount' }),
+      ])),
+      el('tbody', {}, res.items.map((it, i) => el('tr', {}, [
+        el('td', { text: String(i + 1) }),
+        el('td', { text: it.description }),
+        el('td', { class: 'mono num', text: String(it.quantity) }),
+        el('td', { class: 'mono num', text: Number(it.unit_price).toFixed(2) }),
+        el('td', { class: 'mono num', text: Number(it.amount).toFixed(2) }),
+      ]))),
+    ]),
+
+    el('div', { class: 'invoice-totals' }, [
+      totalRow('Subtotal', money(inv.subtotal, inv.currency)),
+      inv.discount ? totalRow('Discount', `− ${money(inv.discount, inv.currency)}`) : null,
+      inv.tax ? totalRow('Tax / VAT', money(inv.tax, inv.currency)) : null,
+      totalRow('Total', money(inv.total, inv.currency), true),
+      totalRow('Paid', money(inv.paid, inv.currency)),
+      totalRow('Balance due', money(due, inv.currency)),
+    ].filter(Boolean)),
+
+    inv.notes ? el('div', { class: 'mt-2' }, [
+      el('div', { class: 'kv__label', text: 'Notes' }),
+      el('div', { class: 'small', text: inv.notes }),
+    ]) : null,
+
+    el('div', { class: 'mt-2 muted small', style: 'border-top:1px solid var(--border);padding-top:14px' }, [
+      company.invoice_terms || '', el('br'), company.invoice_footer || '',
+    ]),
+
+    // No signature block: the invoice comes out of the system, so it states who
+    // raised it and says plainly that it needs no signature. The tracking code
+    // sits opposite, so the client leaves with a way to follow their own file.
+    el('div', { class: 'invoice-foot' }, [
+      el('div', { class: 'invoice-signoff' }, [
+        el('div', { class: 'kv__label', text: 'Prepared by' }),
+        el('div', { class: 'invoice-signoff__name', text: inv.created_by_name || '—' }),
+        el('div', { class: 'faint small', text: fmtDate(inv.created_at) }),
+        el('div', { class: 'invoice-signoff__note', text: company.invoice_generated_note
+          || 'This is a computer-generated invoice and does not require a signature.' }),
+      ]),
+      trackingBlock(company),
+    ]),
+  ]);
+
+  // Internal record — the invoice a client receives shows Paid and Balance due,
+  // not the office's payment log or its buttons.
+  // Money that came in and money that went back, in one list. A refund is its
+  // own row rather than an edit of the original, so the history reads as what
+  // actually happened.
+  const paymentsCard = card('Payments and refunds', table({
+    columns: [
+      { label: 'Date', render: (p) => fmtDate(p.paid_at) },
+      { label: 'Method', render: (p) => p.method },
+      { label: 'Reference', render: (p) => p.reference || '—' },
+      {
+        label: 'Note',
+        render: (p) => (p.reversal_of
+          ? el('div', {}, [
+            el('span', { class: 'badge badge--warn', text: 'Refund' }),
+            el('div', { class: 'cell-sub', text: p.reason || p.note || '' }),
+          ])
+          : (p.note || '—')),
+      },
+      { label: 'Recorded by', render: (p) => p.received_by_name || '—' },
+      {
+        label: 'Amount',
+        align: 'right',
+        render: (p) => el('span', { style: p.amount < 0 ? 'color:var(--danger-fg)' : null,
+          text: money(p.amount, inv.currency) }),
+      },
+      {
+        label: '',
+        align: 'right',
+        render: (p) => el('div', { class: 'row-actions' }, [
+          // Anyone on the team can send money back; that is ordinary business.
+          can('payments') && !p.reversal_of && p.refundable > 0.001 ? el('button', {
+            class: 'btn btn--sm', text: 'Refund',
+            onClick: () => refundForm(p, inv, refresh),
+          }) : null,
+          // Deleting the record itself is an administrator correcting a typo.
+          canDelete() ? el('button', {
+            class: 'btn btn--sm btn--danger', text: 'Delete',
+            title: 'Removes the record entirely — use Refund to return money',
+            onClick: async () => {
+              if (!await confirmDialog(
+                `Delete this ${money(p.amount, inv.currency)} record?\n\n`
+                + 'This is for correcting a mis-typed entry. To return money to a client, '
+                + 'use Refund instead so the original receipt stays on the books.',
+              )) return;
+              try { await api.del(`/api/payments/${p.id}`); toast('Payment record deleted'); refresh(); }
+              catch (err) { toastError(err); }
+            },
+          }) : null,
+        ]),
+      },
+    ],
+    rows: res.payments.map((p) => ({
+      ...p,
+      refundable: p.amount - res.payments
+        .filter((r) => r.reversal_of === p.id)
+        .reduce((sum, r) => sum - r.amount, 0),
+    })),
+    empty: 'No payment received yet',
+    emptyIcon: '৳',
+  }), { flush: true, actions: can('payments') && due > 0.001 ? el('button', {
+    class: 'btn btn--sm btn--accent', text: '+ Record payment',
+    onClick: () => paymentForm(inv, refresh),
+  }) : null });
+  paymentsCard.classList.add('no-print');
+
+  return el('div', { class: 'stack' }, [
+    el('div', { class: 'flex no-print' }, [
+      el('a', { class: 'btn btn--sm btn--ghost', href: '#/invoices', text: '← All invoices' }),
+      el('div', { style: 'flex:1' }),
+      el('button', { class: 'btn btn--sm', text: '🖨 Print', onClick: () => window.print() }),
+      el('button', {
+        class: 'btn btn--sm', text: '⬇ Download PDF',
+        title: 'Opens the print dialog — choose "Save as PDF"',
+        onClick: () => window.print(),
+      }),
+      can('payments') && due > 0.001 ? el('button', {
+        class: 'btn btn--sm btn--accent', text: '৳ Record payment',
+        onClick: () => paymentForm(inv, refresh),
+      }) : null,
+      can('invoices') && inv.status !== 'Cancelled' ? el('button', {
+        class: 'btn btn--sm', text: 'Edit',
+        onClick: async () => {
+          const full = await api.get(`/api/invoices/${inv.id}`);
+          invoiceForm({ ...full.data, items: full.items }, refresh);
+        },
+      }) : null,
+      canDelete() && inv.paid === 0 ? el('button', {
+        class: 'btn btn--sm btn--danger', text: 'Archive',
+        title: 'Takes the invoice out of every list and total. An administrator can restore it.',
+        onClick: async () => {
+          if (!await confirmDialog(`Archive invoice ${inv.invoice_no}?\n\n`
+            + 'It stays in the database and can be restored — it just stops appearing in '
+            + 'lists, totals and reports.')) return;
+          try { await api.del(`/api/invoices/${inv.id}`); toast('Invoice archived'); navigate('/invoices'); }
+          catch (err) { toastError(err); }
+        },
+      }) : null,
+      can('invoices') && inv.status !== 'Cancelled' && inv.paid === 0 ? el('button', {
+        class: 'btn btn--sm btn--danger', text: 'Cancel invoice',
+        onClick: async () => {
+          if (!await confirmDialog(`Cancel invoice ${inv.invoice_no}?`)) return;
+          try { await api.post(`/api/invoices/${inv.id}/cancel`); toast('Invoice cancelled'); refresh(); }
+          catch (err) { toastError(err); }
+        },
+      }) : null,
+    ].filter(Boolean)),
+    sheet,
+    paymentsCard,
+  ]);
+}
+
+function totalRow(label, value, grand) {
+  return el('div', { class: `invoice-totals__row${grand ? ' invoice-totals__row--grand' : ''}` }, [
+    el('span', { text: label }), el('span', { class: 'mono', text: value }),
+  ]);
+}
+
+export /**
+ * Sending money back.
+ *
+ * The reason is required because it is the only thing that later distinguishes a
+ * cancelled trip from a mistake, and because the refund row is permanent — it is
+ * not an edit of the receipt, it sits beside it.
+ */
+function refundForm(payment, invoice, onDone) {
+  formModal({
+    title: `Refund — ${invoice.invoice_no}`,
+    submitLabel: 'Issue refund',
+    fields: [
+      { name: 'amount', label: `Amount to return (${invoice.currency})`, type: 'number',
+        step: '0.01', min: '0.01', value: payment.refundable, required: true,
+        hint: `Up to ${money(payment.refundable, invoice.currency)} of the `
+          + `${money(payment.amount, invoice.currency)} taken on ${fmtDate(payment.paid_at)}` },
+      { name: 'method', label: 'Returned by', type: 'select', required: true,
+        options: listValues('payment_method'), value: payment.method },
+      { name: 'refunded_at', label: 'Refund date', type: 'date', value: todayISO(), required: true },
+      { name: 'reference', label: 'Transaction reference', span: true },
+      { name: 'reason', label: 'Why is this being refunded?', type: 'textarea', span: true, required: true,
+        hint: 'Goes on the permanent record — e.g. "Trip cancelled by client", "Visa rejected, fee returned"' },
+    ],
+    onSubmit: async (values) => {
+      await api.post(`/api/payments/${payment.id}/refund`, values);
+      toast('Refund recorded');
+      onDone();
+    },
+  });
+}
+
+function paymentForm(invoice, onDone) {
+  // Made once, when the form opens. A double-clicked submit carries the same key
+  // and the server books the payment once; opening the form again makes a new one.
+  const submissionKey = `pay-${invoice.id}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  const outstanding = Math.round((invoice.total - invoice.paid) * 100) / 100;
+  formModal({
+    title: `Record payment — ${invoice.invoice_no}`,
+    fields: [
+      el('p', { class: 'muted mt-0', text: `Outstanding balance: ${money(outstanding, invoice.currency)}` }),
+      { legend: 'Payment', fields: [
+        { name: 'amount', label: 'Amount received', type: 'number', step: '0.01', min: '0.01',
+          required: true, value: outstanding },
+        { name: 'method', label: 'Payment method', type: 'select', required: true,
+          options: store.enums.payment_methods, value: 'Cash' },
+        { name: 'paid_at', label: 'Payment date', type: 'date', required: true,
+          value: new Date().toISOString().slice(0, 10) },
+        { name: 'reference', label: 'Transaction reference' },
+        { name: 'note', label: 'Note', type: 'textarea', span: true },
+      ] },
+    ],
+    submitLabel: 'Save payment',
+    onSubmit: async (values) => {
+      await api.post('/api/payments', {
+        ...values, invoice_id: invoice.id, idempotency_key: submissionKey,
+      });
+      toast('Payment recorded');
+      onDone();
+    },
+  });
+}

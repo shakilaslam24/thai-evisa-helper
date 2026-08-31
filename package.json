@@ -1,0 +1,27 @@
+{
+  "name": "dreamfly-crm",
+  "version": "1.0.0",
+  "private": true,
+  "description": "DreamFly Consultancy \u2014 CRM, Lead, B2B Partner, File & Invoice Management System",
+  "type": "commonjs",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "seed": "node server/seed.js",
+    "reset": "node server/seed.js --reset",
+    "admin": "node server/admin.js",
+    "backup": "node server/backup.js",
+    "restore": "node server/backup.js --restore",
+    "doctor": "node server/doctor.js",
+    "update": "bash scripts/update.sh"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "express": "^4.21.2",
+    "multer": "^2.3.0"
+  }
+}
