@@ -49,6 +49,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         ? visa.intro.slice(0, 180)
         : `Visa information and assistance for ${visa.countryName}.`),
     path: `/visa/${visa.slug}`,
+    ogTitle: visa.ogTitle,
+    ogDescription: visa.ogDescription,
     imageUrl: visa.ogImage?.url ?? visa.coverImage?.url,
     canonicalUrl: visa.canonicalUrl,
     noindex: visa.noindex,

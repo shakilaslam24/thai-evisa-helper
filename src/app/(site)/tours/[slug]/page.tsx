@@ -32,8 +32,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   return buildMetadata({
     title: tour.seoTitle || tour.name,
-    description: tour.seoDescription || tour.shortDescription || `${tour.name} — tour package by DreamFly Consultancy.`,
+    description:
+      tour.seoDescription ||
+      tour.shortDescription ||
+      `${tour.name} — tour package by DreamFly Consultancy.`,
     path: `/tours/${tour.slug}`,
+    ogTitle: tour.ogTitle,
+    ogDescription: tour.ogDescription,
     imageUrl: tour.ogImage?.url ?? tour.coverImage?.url,
     canonicalUrl: tour.canonicalUrl,
     noindex: tour.noindex,
@@ -104,8 +109,16 @@ export default async function TourDetailPage({ params }: Props) {
                 <DetailSection title="Highlights">
                   <ul className="grid max-w-3xl gap-2.5 sm:grid-cols-2">
                     {tour.highlights.map((highlight) => (
-                      <li key={highlight.id} className="flex items-start gap-2.5 text-[0.9375rem] leading-relaxed">
-                        <IconCheck width={17} height={17} className="mt-1 shrink-0 text-gold-500" aria-hidden="true" />
+                      <li
+                        key={highlight.id}
+                        className="flex items-start gap-2.5 text-[0.9375rem] leading-relaxed"
+                      >
+                        <IconCheck
+                          width={17}
+                          height={17}
+                          className="mt-1 shrink-0 text-gold-500"
+                          aria-hidden="true"
+                        />
                         <span>{highlight.label}</span>
                       </li>
                     ))}
@@ -121,7 +134,10 @@ export default async function TourDetailPage({ params }: Props) {
                   ["Duration", tour.duration],
                   ["Travel Dates", tour.travelDates],
                   ["Package Type", labelFor(PACKAGE_TYPES, tour.packageType)],
-                  ["Starting Price", tour.startingPrice ? `${tour.currency} ${tour.startingPrice}` : ""],
+                  [
+                    "Starting Price",
+                    tour.startingPrice ? `${tour.currency} ${tour.startingPrice}` : "",
+                  ],
                   ["Availability", labelFor(AVAILABILITY, tour.availability)],
                 ]}
               />
@@ -132,7 +148,10 @@ export default async function TourDetailPage({ params }: Props) {
                 <DetailSection id="itinerary" title="Day-by-Day Itinerary">
                   <ol className="max-w-2xl">
                     {tour.itinerary.map((day) => (
-                      <li key={day.id} className="border-b border-line py-6 first:pt-0 last:border-0">
+                      <li
+                        key={day.id}
+                        className="border-b border-line py-6 first:pt-0 last:border-0"
+                      >
                         <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.16em] text-gold-500">
                           {day.dayLabel}
                         </p>
@@ -140,7 +159,9 @@ export default async function TourDetailPage({ params }: Props) {
                           {day.title}
                         </h3>
                         {day.body ? (
-                          <p className="mt-2 text-[0.9375rem] leading-relaxed text-ink-muted">{day.body}</p>
+                          <p className="mt-2 text-[0.9375rem] leading-relaxed text-ink-muted">
+                            {day.body}
+                          </p>
                         ) : null}
                       </li>
                     ))}
@@ -158,8 +179,16 @@ export default async function TourDetailPage({ params }: Props) {
                         </h3>
                         <ul className="mt-4 space-y-2.5">
                           {includes.map((item) => (
-                            <li key={item.id} className="flex items-start gap-2.5 text-[0.9375rem] leading-relaxed">
-                              <IconCheck width={16} height={16} className="mt-1 shrink-0 text-gold-500" aria-hidden="true" />
+                            <li
+                              key={item.id}
+                              className="flex items-start gap-2.5 text-[0.9375rem] leading-relaxed"
+                            >
+                              <IconCheck
+                                width={16}
+                                height={16}
+                                className="mt-1 shrink-0 text-gold-500"
+                                aria-hidden="true"
+                              />
                               <span>{item.label}</span>
                             </li>
                           ))}
@@ -178,7 +207,12 @@ export default async function TourDetailPage({ params }: Props) {
                               key={item.id}
                               className="flex items-start gap-2.5 text-[0.9375rem] leading-relaxed text-ink-muted"
                             >
-                              <IconClose width={16} height={16} className="mt-1 shrink-0 text-ink-subtle" aria-hidden="true" />
+                              <IconClose
+                                width={16}
+                                height={16}
+                                className="mt-1 shrink-0 text-ink-subtle"
+                                aria-hidden="true"
+                              />
                               <span>{item.label}</span>
                             </li>
                           ))}
@@ -195,7 +229,10 @@ export default async function TourDetailPage({ params }: Props) {
                 <DetailSection title="Gallery">
                   <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                     {tour.gallery.map((item, index) => (
-                      <li key={item.id} className="relative aspect-[4/3] overflow-hidden rounded-sm">
+                      <li
+                        key={item.id}
+                        className="relative aspect-[4/3] overflow-hidden rounded-sm"
+                      >
                         <MediaImage
                           media={item.media}
                           alt={`${tour.name} — image ${index + 1}`}
@@ -252,7 +289,9 @@ export default async function TourDetailPage({ params }: Props) {
         </div>
       </div>
 
-      {schema ? <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: schema }} /> : null}
+      {schema ? (
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: schema }} />
+      ) : null}
     </>
   );
 }

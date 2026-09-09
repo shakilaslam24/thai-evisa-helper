@@ -25,16 +25,56 @@ const db = new PrismaClient({ adapter: new PrismaBetterSqlite3({ url }) });
 const BUSINESS = {
   companyName: "DreamFly Consultancy",
   tagline: "Fly Beyond Your Dreams",
-  primaryPhone: "01335374437",
-  secondaryPhone: "01335374438",
-  whatsappNumber: "8801335374437",
-  email: "dreamflyhelp@gmail.com",
   addressLine1: "Fatema Villa, Lift-2, Flat-3B",
   addressLine2: "House #104, Road #10/2, Block D",
   city: "Niketan, Gulshan-1, Dhaka",
   country: "Bangladesh",
   siteUrl: "https://www.dreamflyconsultancy.com",
 } as const;
+
+/**
+ * Contact channels are repeatable rows, so a hotline or B2B line can be added
+ * from the admin panel without a code change.
+ */
+const CONTACT_NUMBERS = [
+  {
+    id: "seed_primary_phone",
+    label: "Main Office",
+    number: "01335374437",
+    whatsappNumber: "8801335374437",
+    whatsappEnabled: true,
+    isPrimary: true,
+    isPrimaryWhatsapp: true,
+    showInFooter: true,
+    showOnContact: true,
+    showInMobileBar: true,
+    sortOrder: 0,
+  },
+  {
+    id: "seed_secondary_phone",
+    label: "Main Office",
+    number: "01335374438",
+    whatsappEnabled: false,
+    isPrimary: false,
+    isPrimaryWhatsapp: false,
+    showInFooter: true,
+    showOnContact: true,
+    showInMobileBar: false,
+    sortOrder: 1,
+  },
+] as const;
+
+const CONTACT_EMAILS = [
+  {
+    id: "seed_primary_email",
+    label: "General",
+    address: "dreamflyhelp@gmail.com",
+    isPrimary: true,
+    showInFooter: true,
+    showOnContact: true,
+    sortOrder: 0,
+  },
+] as const;
 
 const HOME_SECTIONS = [
   {
@@ -201,6 +241,14 @@ async function main() {
     },
   });
 
+  // --- Contact channels ----------------------------------------------------
+  for (const entry of CONTACT_NUMBERS) {
+    await db.contactNumber.upsert({ where: { id: entry.id }, update: {}, create: { ...entry } });
+  }
+  for (const entry of CONTACT_EMAILS) {
+    await db.contactEmail.upsert({ where: { id: entry.id }, update: {}, create: { ...entry } });
+  }
+
   // --- Homepage structure -------------------------------------------------
   for (const section of HOME_SECTIONS) {
     await db.homeSection.upsert({
@@ -320,7 +368,7 @@ async function main() {
   }
 
   console.log("Seed complete.");
-  console.log("  Real data:   Global Settings, homepage structure, services, why-items.");
+  console.log("  Real data:   Global Settings, contact numbers, email, homepage structure.");
   console.log(`  Sample data: ${SAMPLE_VISA_COUNTRIES.length} visa destinations + 1 tour package`);
   console.log("               (draft + placeholder — invisible on the public site).");
   console.log("\nNext: create an admin user with `npm run admin:create`.");

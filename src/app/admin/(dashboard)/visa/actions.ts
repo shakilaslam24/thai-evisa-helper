@@ -6,7 +6,14 @@ import { db } from "@/lib/db";
 import { audit } from "@/lib/audit";
 import { requireAdmin } from "@/lib/auth/guard";
 import { visaSchema } from "@/lib/validation/admin";
-import { fail, ok, parseForm, revalidatePublic, type ActionState } from "@/lib/admin/actions";
+import {
+  fail,
+  formValues,
+  ok,
+  parseForm,
+  revalidatePublic,
+  type ActionState,
+} from "@/lib/admin/actions";
 import { documentRowSchema, faqRowSchema, parseRows } from "@/lib/admin/rows";
 import { serialiseList } from "@/lib/list";
 import { slugify } from "@/lib/format";
@@ -30,9 +37,13 @@ export async function saveVisaAction(_prev: ActionState, formData: FormData): Pr
     select: { id: true },
   });
   if (clash) {
-    return fail("That URL slug is already used by another destination.", {
-      slug: "Choose a different slug.",
-    });
+    return fail(
+      "That URL slug is already used by another destination.",
+      {
+        slug: "Choose a different slug.",
+      },
+      formValues(formData),
+    );
   }
 
   const documents = parseRows(formData.get("documents"), documentRowSchema);
@@ -61,6 +72,8 @@ export async function saveVisaAction(_prev: ActionState, formData: FormData): Pr
     isPlaceholder: input.isPlaceholder,
     seoTitle: input.seoTitle,
     seoDescription: input.seoDescription,
+    ogTitle: input.ogTitle,
+    ogDescription: input.ogDescription,
     canonicalUrl: input.canonicalUrl,
     noindex: input.noindex,
     coverImageId: input.coverImageId,

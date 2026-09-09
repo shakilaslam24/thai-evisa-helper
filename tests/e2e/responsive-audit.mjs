@@ -11,11 +11,21 @@
 import { chromium } from "playwright";
 
 const BASE = "http://localhost:3000";
-const PAGES = ["/", "/visa", "/visa/japan", "/tours", "/air-ticket-hotel", "/b2b", "/about", "/contact", "/does-not-exist"];
+const PAGES = [
+  "/", "/visa", "/visa/china", "/visa/japan", "/visa/thailand", "/visa/malaysia",
+  "/tours", "/tours/thailand-escape-bangkok-pattaya", "/tours/japan-discovery-tour",
+  "/air-ticket-hotel", "/b2b", "/about", "/contact", "/does-not-exist",
+];
+// The narrow widths matter most: 320 is the smallest phone still in use.
 const VIEWPORTS = [
-  { name: "mobile", width: 390, height: 844 },
+  { name: "320", width: 320, height: 720 },
+  { name: "360", width: 360, height: 800 },
+  { name: "390", width: 390, height: 844 },
+  { name: "430", width: 430, height: 932 },
   { name: "tablet", width: 820, height: 1180 },
-  { name: "desktop", width: 1440, height: 900 },
+  { name: "1280", width: 1280, height: 800 },
+  { name: "1440", width: 1440, height: 900 },
+  { name: "1920", width: 1920, height: 1080 },
 ];
 
 const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium" });

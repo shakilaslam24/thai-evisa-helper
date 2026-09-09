@@ -107,27 +107,34 @@ export const getTourBySlug = cache((slug: string) =>
 );
 
 /**
- * The campaign band.
+ * Campaigns.
  *
- * Returns null unless a campaign is active AND inside its scheduled window, so
- * an expired campaign disappears on its own and an empty section is never
- * rendered (brief §5.04).
+ * A campaign shows only while it is active AND inside its scheduled window, so
+ * an expired one disappears on its own with no edit, and a section with nothing
+ * to show is never rendered (brief §6, §11).
+ *
+ * `displayLocation` decides where it runs: the homepage band, the site-wide
+ * announcement bar, or the top of the visa / tours / B2B pages.
  */
-export const getActiveCampaign = cache(async () => {
+export const getActiveCampaign = cache(async (location: string = "homepage") => {
   const now = new Date();
   return db.campaign.findFirst({
     where: {
       active: true,
       isPlaceholder: false,
+      displayLocation: location,
       AND: [
         { OR: [{ startsAt: null }, { startsAt: { lte: now } }] },
         { OR: [{ endsAt: null }, { endsAt: { gte: now } }] },
       ],
     },
-    orderBy: [{ sortOrder: "asc" }, { updatedAt: "desc" }],
+    orderBy: [{ featured: "desc" }, { sortOrder: "asc" }, { updatedAt: "desc" }],
     include: { desktopImage: true, mobileImage: true },
   });
 });
+
+/** The thin site-wide notice above the header. Null when nothing is running. */
+export const getAnnouncement = cache(() => getActiveCampaign("announcement_bar"));
 
 /** Only real, admin-published testimonials. Never invented (brief §5.07). */
 export const getTestimonials = cache((take = 6) =>

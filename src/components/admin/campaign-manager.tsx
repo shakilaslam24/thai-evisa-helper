@@ -14,6 +14,7 @@ import {
 } from "./form-controls";
 import { MediaPicker, type MediaOption } from "./media-picker";
 import { EmptyState, Panel, StatusBadge } from "./ui";
+import { CAMPAIGN_LOCATIONS } from "./contact-constants";
 
 export type CampaignRow = {
   id: string;
@@ -25,6 +26,8 @@ export type CampaignRow = {
   startsAt: string;
   endsAt: string;
   active: boolean;
+  featured: boolean;
+  displayLocation: string;
   sortOrder: number;
   isPlaceholder: boolean;
   desktopImageId: string | null;
@@ -43,6 +46,8 @@ const BLANK: CampaignRow = {
   startsAt: "",
   endsAt: "",
   active: false,
+  featured: false,
+  displayLocation: "homepage",
   sortOrder: 0,
   isPlaceholder: false,
   desktopImageId: null,
@@ -86,9 +91,12 @@ export function CampaignManager({
                     <p className="mt-0.5 text-[0.875rem] text-ink-muted">{campaign.headline}</p>
                   ) : null}
                   <p className="mt-2 text-[0.75rem] text-ink-subtle">
+                    {CAMPAIGN_LOCATIONS.find((l) => l.value === campaign.displayLocation)?.label ??
+                      campaign.displayLocation}
+                    {" · "}
                     {campaign.startsAt || campaign.endsAt
                       ? `${campaign.startsAt || "no start"} → ${campaign.endsAt || "no end"}`
-                      : "Always on while active"}
+                      : "always on while active"}
                   </p>
                 </div>
 

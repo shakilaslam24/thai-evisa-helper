@@ -23,6 +23,8 @@ export async function generateMetadata(): Promise<Metadata> {
       seo?.description ||
       "Domestic and international air ticket assistance and worldwide hotel booking. Send us your route and dates and we'll come back with options.",
     path: "/air-ticket-hotel",
+    ogTitle: seo?.ogTitle,
+    ogDescription: seo?.ogDescription,
     imageUrl: seo?.ogImage?.url,
     canonicalUrl: seo?.canonicalUrl,
     noindex: seo?.noindex,
@@ -121,7 +123,9 @@ export default async function AirTicketHotelPage() {
         </div>
       </section>
 
-      {schema ? <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: schema }} /> : null}
+      {schema ? (
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: schema }} />
+      ) : null}
     </>
   );
 }

@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PageHero } from "@/components/site/page-hero";
+import { PageCampaign } from "@/components/site/page-campaign";
 import { B2bForm } from "@/components/forms/b2b-form";
 import { WhatsAppLink } from "@/components/site/whatsapp-link";
 import { Reveal } from "@/components/ui/reveal";
 import { Icon, IconArrowRight } from "@/components/ui/icons";
-import { getPageSeo } from "@/lib/content";
+import { getActiveCampaign, getPageSeo } from "@/lib/content";
 import { getSettings, telHref } from "@/lib/settings";
 import { breadcrumbSchema, buildMetadata, jsonLd } from "@/lib/seo";
 
@@ -54,6 +55,8 @@ export async function generateMetadata(): Promise<Metadata> {
       seo?.description ||
       "Partner with DreamFly for professional B2B travel solutions — visa processing, air tickets, hotels and tour package support for travel agencies.",
     path: "/b2b",
+    ogTitle: seo?.ogTitle,
+    ogDescription: seo?.ogDescription,
     imageUrl: seo?.ogImage?.url,
     canonicalUrl: seo?.canonicalUrl,
     noindex: seo?.noindex,
@@ -61,7 +64,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function B2bPage() {
-  const settings = await getSettings();
+  const [settings, campaign] = await Promise.all([getSettings(), getActiveCampaign("b2b")]);
   const schema = jsonLd(breadcrumbSchema(settings.origin, CRUMBS));
 
   return (
@@ -73,6 +76,8 @@ export default async function B2bPage() {
         description="Partner with DreamFly for professional B2B travel solutions."
         crumbs={CRUMBS}
       />
+
+      <PageCampaign campaign={campaign} />
 
       <section className="section">
         <div className="container-df">

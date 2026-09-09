@@ -20,16 +20,74 @@ type Props = {
   tone?: "navy" | "light";
 };
 
-/** Three flight paths, offset per seed so a grid of panels stays varied. */
-const PATHS = [
-  "M-60 268 C 120 214, 300 150, 500 52",
-  "M-60 300 C 140 258, 320 196, 500 104",
-  "M-60 336 C 160 302, 340 248, 500 162",
+/**
+ * Six compositions rather than one nudged sideways. A grid of four or five
+ * panels sits together on the page, so they have to differ at a glance —
+ * different climb angles, a different horizon, the aircraft in a different
+ * place — while still reading as one family.
+ */
+const COMPOSITIONS = [
+  {
+    paths: [
+      "M-60 268 C 120 214, 300 150, 500 52",
+      "M-60 300 C 140 258, 320 196, 500 104",
+      "M-60 336 C 160 302, 340 248, 500 162",
+    ],
+    glow: [0.74, 0.16],
+    plane: [462, 46, -27],
+  },
+  {
+    paths: [
+      "M-60 232 C 150 210, 320 120, 500 20",
+      "M-60 276 C 170 250, 340 168, 500 74",
+      "M-60 318 C 190 296, 360 224, 500 140",
+    ],
+    glow: [0.24, 0.2],
+    plane: [468, 14, -33],
+  },
+  {
+    paths: [
+      "M-60 300 C 130 288, 300 214, 500 128",
+      "M-60 330 C 150 320, 320 254, 500 176",
+      "M-60 358 C 170 350, 340 292, 500 220",
+    ],
+    glow: [0.82, 0.34],
+    plane: [464, 122, -21],
+  },
+  {
+    paths: [
+      "M-60 190 C 160 196, 330 132, 500 66",
+      "M-60 234 C 180 240, 350 182, 500 122",
+      "M-60 278 C 200 286, 370 232, 500 178",
+    ],
+    glow: [0.5, 0.1],
+    plane: [466, 60, -19],
+  },
+  {
+    paths: [
+      "M-60 320 C 110 250, 290 140, 500 34",
+      "M-60 352 C 130 292, 310 190, 500 92",
+      "M-60 380 C 150 332, 330 240, 500 150",
+    ],
+    glow: [0.66, 0.44],
+    plane: [470, 28, -31],
+  },
+  {
+    paths: [
+      "M-60 248 C 140 244, 320 176, 500 96",
+      "M-60 292 C 160 288, 340 228, 500 152",
+      "M-60 334 C 180 332, 360 278, 500 208",
+    ],
+    glow: [0.3, 0.5],
+    plane: [462, 90, -24],
+  },
 ];
 
 export function BrandPanel({ seed = 0, className = "", label, tone = "navy" }: Props) {
-  const variant = Math.abs(seed) % 3;
-  const shift = variant * 26;
+  const variant = Math.abs(seed) % COMPOSITIONS.length;
+  const composition = COMPOSITIONS[variant] ?? COMPOSITIONS[0]!;
+  const [glowX, glowY] = composition.glow;
+  const [planeX, planeY, planeAngle] = composition.plane;
   const isLight = tone === "light";
 
   const ink = isLight ? "#101f40" : "#ffffff";
@@ -61,7 +119,7 @@ export function BrandPanel({ seed = 0, className = "", label, tone = "navy" }: P
             <stop offset="38%" stopColor={ink} stopOpacity="0.85" />
             <stop offset="100%" stopColor={ink} stopOpacity="0.08" />
           </linearGradient>
-          <radialGradient id={`${uid}-glow`} cx="0.72" cy="0.18" r="0.78">
+          <radialGradient id={`${uid}-glow`} cx={glowX} cy={glowY} r="0.78">
             <stop offset="0%" stopColor={glow} stopOpacity={isLight ? "1" : "0.95"} />
             <stop offset="100%" stopColor={glow} stopOpacity="0" />
           </radialGradient>
@@ -70,8 +128,8 @@ export function BrandPanel({ seed = 0, className = "", label, tone = "navy" }: P
         {/* Horizon glow, anchored top-right */}
         <rect x="0" y="0" width="440" height="300" fill={`url(#${uid}-glow)`} />
 
-        <g transform={`translate(${-shift * 0.5} ${shift * 0.5})`}>
-          {PATHS.map((d, index) => (
+        <g>
+          {composition.paths.map((d, index) => (
             <path
               key={d}
               d={d}
@@ -85,7 +143,7 @@ export function BrandPanel({ seed = 0, className = "", label, tone = "navy" }: P
           {/* The 5% gold: a short lit segment on the leading path, and the
               aircraft sitting at its head */}
           <path
-            d={PATHS[0]}
+            d={composition.paths[0]}
             fill="none"
             stroke={gold}
             strokeOpacity="0.9"
@@ -94,7 +152,7 @@ export function BrandPanel({ seed = 0, className = "", label, tone = "navy" }: P
             strokeDasharray="46 999"
             strokeDashoffset="-372"
           />
-          <g transform="translate(462 46) rotate(-27)" fill={gold}>
+          <g transform={`translate(${planeX} ${planeY}) rotate(${planeAngle})`} fill={gold}>
             <path d="M0 0 -13 4.4 -13 1.6 -4 -1.2 -13 -4 -13 -6.8 0 -2.4 Z" opacity="0.95" />
           </g>
         </g>

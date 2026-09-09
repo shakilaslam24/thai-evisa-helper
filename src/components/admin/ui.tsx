@@ -142,7 +142,7 @@ export function EmptyState({
 
 export function DataTable({ head, children }: { head: string[]; children: ReactNode }) {
   return (
-    <div className="overflow-x-auto rounded-md border border-line">
+    <div className="min-w-0 overflow-x-auto rounded-md border border-line">
       <table className="w-full min-w-[44rem] border-collapse text-left">
         <thead>
           <tr className="border-b border-line bg-surface-alt">

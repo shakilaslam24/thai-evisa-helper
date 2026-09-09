@@ -94,10 +94,13 @@ export function Textarea({
 export function Select({
   options,
   defaultValue,
+  onChange,
   ...field
 }: FieldProps & {
   options: ReadonlyArray<{ value: string; label: string }>;
   defaultValue?: string | null;
+  /** Optional, for the few forms whose layout depends on the choice. */
+  onChange?: (value: string) => void;
 }) {
   const id = useId();
   return (
@@ -106,6 +109,7 @@ export function Select({
         id={id}
         name={field.name}
         defaultValue={defaultValue ?? ""}
+        onChange={onChange ? (event) => onChange(event.target.value) : undefined}
         className="input"
         aria-invalid={field.error ? "true" : undefined}
       >

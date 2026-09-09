@@ -10,12 +10,34 @@ Everything about the business lives in **Global Settings** — phone numbers,
 WhatsApp, email, address, office hours, social links, analytics and SEO
 defaults. Change something here and it updates on **every page** at once.
 
-Two fields matter more than the rest:
+### Phone numbers — add as many as you need
 
-- **Primary WhatsApp** — every WhatsApp button on the site is hidden until this
-  is filled in. Use full international format, digits only: `8801335374437`.
+Phone numbers are a **list**, not two fixed boxes. Press **+ Add number** for
+each line you want on the site.
+
+For every number you choose:
+
+| Setting | What it does |
+|---|---|
+| **Label** | Main Office, WhatsApp, Hotline, B2B, Support, or your own wording |
+| **This number is on WhatsApp** | Makes it usable for WhatsApp buttons |
+| **WhatsApp number** | Full international form, digits only — `8801335374437`. Leave empty to reuse the number itself |
+| **Show on** | Header, footer, contact page, mobile call bar — tick any combination |
+| **Main phone number** | Used wherever the site shows a single number |
+| **Main WhatsApp number** | Used by every WhatsApp button |
+
+Use ↑ ↓ to reorder. **Every WhatsApp button stays hidden until one number has
+WhatsApp switched on** — the panel warns you if none does.
+
+**Email addresses** and **office hours** work the same way: add as many rows as
+you need and choose where each appears.
+
+### Two other fields that matter
+
 - **Google Maps embed URL** — the map on the Contact page appears once this is
   set. In Google Maps: *Share → Embed a map*, then copy only the `src="…"` URL.
+- **Site URL** — your real address. Used for every canonical link, the sitemap
+  and social previews.
 
 ---
 
@@ -82,19 +104,33 @@ name, a duration. Everything else belongs on the package page.
 
 ---
 
-## Campaigns
+## Campaigns, offers and announcements
 
 `/admin/campaigns`
 
-A campaign is the promotional band on the homepage — Canton Fair, a seasonal
-offer, a country push.
+One place for anything time-limited: a Canton Fair push, a seasonal offer, a new
+visa update, a holiday notice, an office update.
+
+**Where it appears** is up to you:
+
+| Place | Looks like |
+|---|---|
+| **Homepage section** | A full navy band in the middle of the homepage |
+| **Announcement bar** | A thin strip above the header, on every page — best for a short notice |
+| **Visa listing page** | A compact strip above the country list |
+| **Tour listing page** | The same, above the packages |
+| **B2B page** | The same, for agency-facing offers |
 
 Set **Starts** and **Ends** and it runs itself: it appears on the start date and
-**disappears on its own** after the end date. Nothing to remember, nothing left
-stale.
+**disappears on its own** afterwards. Nothing to remember, nothing left stale.
 
-If no campaign is active and in date, the section is removed from the homepage
-entirely rather than leaving an empty gap.
+If two campaigns share a place, tick **Priority** on the one that should win.
+
+If nothing is active and in date, that section is removed entirely rather than
+leaving an empty gap.
+
+**Image sizes:** desktop 1600×700, mobile 1080×1350. Upload both if the artwork
+has text in it, so nothing gets cropped awkwardly on a phone.
 
 ---
 
@@ -170,7 +206,30 @@ Facebook or Google campaign parameters, so you can see which advert produced it.
 
 ---
 
-## SEO
+## SEO and Google Search Console
+
+`/admin/seo`
+
+The top of this page is a live status panel: your site URL, whether indexing is
+allowed, whether Google verification is set, the sitemap URL and how many pages
+it contains, and buttons to open the sitemap, robots.txt and Search Console.
+
+### Connecting Google Search Console
+
+1. Open Search Console and add your site as a property.
+2. Choose the **HTML tag** method.
+3. Copy only the token — the `content="…"` part — into **Global Settings →
+   Search Console verification**.
+4. Save, deploy, then press Verify in Search Console.
+5. In Search Console → **Sitemaps**, enter `sitemap.xml` and press Submit.
+
+The sitemap updates itself. Publish a new visa page and it appears; unpublish
+one and it disappears. You never need to touch it again.
+
+> There is no "request indexing" button, and there deliberately never will be.
+> Google provides no honest way to do that from outside its own console.
+
+### Per-page SEO
 
 `/admin/seo`
 

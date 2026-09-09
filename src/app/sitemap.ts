@@ -2,7 +2,15 @@ import type { MetadataRoute } from "next";
 import { db } from "@/lib/db";
 import { getSettings } from "@/lib/settings";
 
-export const revalidate = 3600;
+/**
+ * Always generated fresh.
+ *
+ * These two files are correctness-critical and crawled rarely, so caching them
+ * buys nothing and risks a great deal: a build run while "allow indexing" was
+ * off would otherwise bake a site-wide Disallow into sitemap and serve it
+ * until the cache happened to expire.
+ */
+export const dynamic = "force-dynamic";
 
 /** Static marketing routes, with priorities that reflect commercial intent. */
 const STATIC_ROUTES: Array<{

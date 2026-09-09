@@ -31,6 +31,8 @@ export async function generateMetadata(): Promise<Metadata> {
     title: seo?.title || undefined,
     description: seo?.description || undefined,
     path: "/",
+    ogTitle: seo?.ogTitle,
+    ogDescription: seo?.ogDescription,
     imageUrl: seo?.ogImage?.url,
     canonicalUrl: seo?.canonicalUrl,
     noindex: seo?.noindex,

@@ -14,7 +14,10 @@ function toDate(value: string, endOfDay = false): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-export async function saveCampaignAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export async function saveCampaignAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
   const user = await requireAdmin();
   const id = String(formData.get("id") ?? "").trim();
 
@@ -31,6 +34,8 @@ export async function saveCampaignAction(_prev: ActionState, formData: FormData)
     startsAt: toDate(input.startsAt),
     endsAt: toDate(input.endsAt, true),
     active: input.active,
+    featured: input.featured,
+    displayLocation: input.displayLocation,
     sortOrder: input.sortOrder,
     isPlaceholder: input.isPlaceholder,
     desktopImageId: input.desktopImageId,
@@ -59,7 +64,10 @@ export async function toggleCampaignAction(formData: FormData): Promise<void> {
   const id = String(formData.get("id") ?? "");
   if (!id) return;
 
-  const campaign = await db.campaign.findUnique({ where: { id }, select: { active: true, name: true } });
+  const campaign = await db.campaign.findUnique({
+    where: { id },
+    select: { active: true, name: true },
+  });
   if (!campaign) return;
 
   await db.campaign.update({ where: { id }, data: { active: !campaign.active } });

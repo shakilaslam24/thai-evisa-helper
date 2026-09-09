@@ -38,7 +38,12 @@ export default async function TourEditPage({ params }: { params: Promise<{ id: s
         backLabel="All packages"
         actions={
           tour.status === "published" && !tour.isPlaceholder ? (
-            <a href={`/tours/${tour.slug}`} target="_blank" rel="noopener" className="btn btn-outline btn-sm">
+            <a
+              href={`/tours/${tour.slug}`}
+              target="_blank"
+              rel="noopener"
+              className="btn btn-outline btn-sm"
+            >
               View live page
             </a>
           ) : null
@@ -50,8 +55,14 @@ export default async function TourEditPage({ params }: { params: Promise<{ id: s
           tour={{
             ...tour,
             highlights: tour.highlights.map((row) => row.label).join("\n"),
-            includes: tour.listItems.filter((row) => row.kind === "include").map((row) => row.label).join("\n"),
-            excludes: tour.listItems.filter((row) => row.kind === "exclude").map((row) => row.label).join("\n"),
+            includes: tour.listItems
+              .filter((row) => row.kind === "include")
+              .map((row) => row.label)
+              .join("\n"),
+            excludes: tour.listItems
+              .filter((row) => row.kind === "exclude")
+              .map((row) => row.label)
+              .join("\n"),
             itinerary: tour.itinerary.map((row) => ({
               dayLabel: row.dayLabel,
               title: row.title,

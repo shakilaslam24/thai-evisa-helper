@@ -28,6 +28,8 @@ export function PageSeoForm({
   seo: {
     title: string;
     description: string;
+    ogTitle: string;
+    ogDescription: string;
     canonicalUrl: string;
     noindex: boolean;
     ogImageId: string | null;

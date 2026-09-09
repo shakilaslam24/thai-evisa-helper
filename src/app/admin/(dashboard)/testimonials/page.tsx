@@ -10,7 +10,9 @@ export default async function TestimonialsPage() {
   const user = await requireAdmin();
 
   const [testimonials, media] = await Promise.all([
-    db.testimonial.findMany({ orderBy: [{ published: "desc" }, { sortOrder: "asc" }, { createdAt: "desc" }] }),
+    db.testimonial.findMany({
+      orderBy: [{ published: "desc" }, { sortOrder: "asc" }, { createdAt: "desc" }],
+    }),
     db.media.findMany({
       orderBy: { createdAt: "desc" },
       take: 300,
@@ -32,6 +34,8 @@ export default async function TestimonialsPage() {
             authorTitle: row.authorTitle,
             quote: row.quote,
             serviceType: row.serviceType,
+            destination: row.destination,
+            reviewDate: row.reviewDate ? row.reviewDate.toISOString().slice(0, 10) : "",
             rating: row.rating,
             published: row.published,
             sortOrder: row.sortOrder,

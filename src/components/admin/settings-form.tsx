@@ -14,14 +14,13 @@ import {
 import { MediaPicker, type MediaOption } from "./media-picker";
 import { Panel } from "./ui";
 import { IDLE_STATE } from "./action-state";
+import { UnsavedGuard } from "./unsaved-guard";
+import { RestoreValues } from "./restore-values";
+import { replayed } from "./use-form-values";
 
 type Settings = {
   companyName: string;
   tagline: string;
-  primaryPhone: string;
-  secondaryPhone: string;
-  whatsappNumber: string;
-  email: string;
   addressLine1: string;
   addressLine2: string;
   city: string;
@@ -35,6 +34,8 @@ type Settings = {
   linkedinUrl: string;
   officeHours: string;
   footerText: string;
+  googleSiteVerification: string;
+  bingSiteVerification: string;
   gaMeasurementId: string;
   gtmContainerId: string;
   metaPixelId: string;
@@ -51,22 +52,25 @@ type Settings = {
 export function SettingsForm({ settings, media }: { settings: Settings; media: MediaOption[] }) {
   const [state, action] = useActionState(saveSettingsAction, IDLE_STATE);
   const error = (field: string) => state.fieldErrors?.[field];
+  const kept = replayed(state);
 
   return (
     <form action={action} className="grid max-w-4xl gap-6">
+      <UnsavedGuard />
+      <RestoreValues state={state} />
       <Panel title="Identity">
         <FieldGrid>
           <Input
             label="Company name"
             name="companyName"
-            defaultValue={settings.companyName}
+            defaultValue={kept("companyName", settings.companyName)}
             required
             error={error("companyName")}
           />
           <Input
             label="Tagline"
             name="tagline"
-            defaultValue={settings.tagline}
+            defaultValue={kept("tagline", settings.tagline)}
             error={error("tagline")}
           />
           <FullWidth>
@@ -74,7 +78,7 @@ export function SettingsForm({ settings, media }: { settings: Settings; media: M
               label="Footer text"
               name="footerText"
               rows={2}
-              defaultValue={settings.footerText}
+              defaultValue={kept("footerText", settings.footerText)}
               hint="One or two sentences shown beside the logo in the footer."
               error={error("footerText")}
             />
@@ -91,65 +95,28 @@ export function SettingsForm({ settings, media }: { settings: Settings; media: M
             label="Logo — light backgrounds"
             name="logoLightId"
             options={media}
-            defaultValue={settings.logoLightId}
+            defaultValue={kept("logoLightId", settings.logoLightId)}
             hint="Navy artwork, used in the header."
           />
           <MediaPicker
             label="Logo — dark backgrounds"
             name="logoDarkId"
             options={media}
-            defaultValue={settings.logoDarkId}
+            defaultValue={kept("logoDarkId", settings.logoDarkId)}
             hint="White artwork, used in the footer and admin."
           />
           <MediaPicker
             label="Favicon"
             name="faviconId"
             options={media}
-            defaultValue={settings.faviconId}
+            defaultValue={kept("faviconId", settings.faviconId)}
           />
           <MediaPicker
             label="Default social image"
             name="defaultSocialImageId"
             options={media}
-            defaultValue={settings.defaultSocialImageId}
+            defaultValue={kept("defaultSocialImageId", settings.defaultSocialImageId)}
             hint="1200×630 works best. Shown when a link is shared."
-          />
-        </FieldGrid>
-      </Panel>
-
-      <Panel title="Contact">
-        <FieldGrid>
-          <Input
-            label="Primary phone"
-            name="primaryPhone"
-            defaultValue={settings.primaryPhone}
-            error={error("primaryPhone")}
-          />
-          <Input
-            label="Secondary phone"
-            name="secondaryPhone"
-            defaultValue={settings.secondaryPhone}
-            error={error("secondaryPhone")}
-          />
-          <Input
-            label="Primary WhatsApp"
-            name="whatsappNumber"
-            defaultValue={settings.whatsappNumber}
-            hint="Full international format, digits only — e.g. 8801335374437. Every WhatsApp button uses this."
-            error={error("whatsappNumber")}
-          />
-          <Input
-            label="Email"
-            name="email"
-            type="email"
-            defaultValue={settings.email}
-            error={error("email")}
-          />
-          <Input
-            label="Office hours"
-            name="officeHours"
-            defaultValue={settings.officeHours}
-            error={error("officeHours")}
           />
         </FieldGrid>
       </Panel>
@@ -159,32 +126,32 @@ export function SettingsForm({ settings, media }: { settings: Settings; media: M
           <Input
             label="Address line 1"
             name="addressLine1"
-            defaultValue={settings.addressLine1}
+            defaultValue={kept("addressLine1", settings.addressLine1)}
             error={error("addressLine1")}
           />
           <Input
             label="Address line 2"
             name="addressLine2"
-            defaultValue={settings.addressLine2}
+            defaultValue={kept("addressLine2", settings.addressLine2)}
             error={error("addressLine2")}
           />
           <Input
             label="City / area"
             name="city"
-            defaultValue={settings.city}
+            defaultValue={kept("city", settings.city)}
             error={error("city")}
           />
           <Input
             label="Country"
             name="country"
-            defaultValue={settings.country}
+            defaultValue={kept("country", settings.country)}
             error={error("country")}
           />
           <FullWidth>
             <Input
               label="Google Maps link"
               name="googleMapsUrl"
-              defaultValue={settings.googleMapsUrl}
+              defaultValue={kept("googleMapsUrl", settings.googleMapsUrl)}
               hint="Used by the Location button in the mobile action bar."
               error={error("googleMapsUrl")}
             />
@@ -193,7 +160,7 @@ export function SettingsForm({ settings, media }: { settings: Settings; media: M
             <Input
               label="Google Maps embed URL"
               name="googleMapsEmbed"
-              defaultValue={settings.googleMapsEmbed}
+              defaultValue={kept("googleMapsEmbed", settings.googleMapsEmbed)}
               hint='In Google Maps choose Share → Embed a map, then copy only the src="…" URL. The map appears on the Contact page once this is set.'
               error={error("googleMapsEmbed")}
             />
@@ -206,31 +173,31 @@ export function SettingsForm({ settings, media }: { settings: Settings; media: M
           <Input
             label="Facebook"
             name="facebookUrl"
-            defaultValue={settings.facebookUrl}
+            defaultValue={kept("facebookUrl", settings.facebookUrl)}
             error={error("facebookUrl")}
           />
           <Input
             label="Instagram"
             name="instagramUrl"
-            defaultValue={settings.instagramUrl}
+            defaultValue={kept("instagramUrl", settings.instagramUrl)}
             error={error("instagramUrl")}
           />
           <Input
             label="TikTok"
             name="tiktokUrl"
-            defaultValue={settings.tiktokUrl}
+            defaultValue={kept("tiktokUrl", settings.tiktokUrl)}
             error={error("tiktokUrl")}
           />
           <Input
             label="YouTube"
             name="youtubeUrl"
-            defaultValue={settings.youtubeUrl}
+            defaultValue={kept("youtubeUrl", settings.youtubeUrl)}
             error={error("youtubeUrl")}
           />
           <Input
             label="LinkedIn"
             name="linkedinUrl"
-            defaultValue={settings.linkedinUrl}
+            defaultValue={kept("linkedinUrl", settings.linkedinUrl)}
             error={error("linkedinUrl")}
           />
         </FieldGrid>
@@ -242,7 +209,7 @@ export function SettingsForm({ settings, media }: { settings: Settings; media: M
             <Input
               label="Default title"
               name="defaultSeoTitle"
-              defaultValue={settings.defaultSeoTitle}
+              defaultValue={kept("defaultSeoTitle", settings.defaultSeoTitle)}
               error={error("defaultSeoTitle")}
             />
           </FullWidth>
@@ -251,7 +218,7 @@ export function SettingsForm({ settings, media }: { settings: Settings; media: M
               label="Default description"
               name="defaultSeoDescription"
               rows={3}
-              defaultValue={settings.defaultSeoDescription}
+              defaultValue={kept("defaultSeoDescription", settings.defaultSeoDescription)}
               hint="Aim for 150–160 characters."
               error={error("defaultSeoDescription")}
             />
@@ -260,7 +227,7 @@ export function SettingsForm({ settings, media }: { settings: Settings; media: M
             <Input
               label="Site URL"
               name="siteUrl"
-              defaultValue={settings.siteUrl}
+              defaultValue={kept("siteUrl", settings.siteUrl)}
               hint="The public address, with no trailing slash. Used for canonical links and the sitemap."
               error={error("siteUrl")}
             />
@@ -277,6 +244,33 @@ export function SettingsForm({ settings, media }: { settings: Settings; media: M
       </Panel>
 
       <Panel
+        title="Search Console verification"
+        description="Paste the token Google (or Bing) gives you. The right meta tag is then added to every page automatically — no code editing."
+      >
+        <FieldGrid>
+          <FullWidth>
+            <Input
+              label="Google site verification token"
+              name="googleSiteVerification"
+              defaultValue={kept("googleSiteVerification", settings.googleSiteVerification)}
+              placeholder="e.g. AbCdEf123456…"
+              hint='In Search Console choose the "HTML tag" method, then paste only the content="…" value here.'
+              error={error("googleSiteVerification")}
+            />
+          </FullWidth>
+          <FullWidth>
+            <Input
+              label="Bing site verification token"
+              name="bingSiteVerification"
+              defaultValue={kept("bingSiteVerification", settings.bingSiteVerification)}
+              hint="Optional."
+              error={error("bingSiteVerification")}
+            />
+          </FullWidth>
+        </FieldGrid>
+      </Panel>
+
+      <Panel
         title="Analytics"
         description="Nothing loads in the visitor's browser until an ID is entered here."
       >
@@ -284,21 +278,21 @@ export function SettingsForm({ settings, media }: { settings: Settings; media: M
           <Input
             label="GA4 Measurement ID"
             name="gaMeasurementId"
-            defaultValue={settings.gaMeasurementId}
+            defaultValue={kept("gaMeasurementId", settings.gaMeasurementId)}
             placeholder="G-XXXXXXXXXX"
             error={error("gaMeasurementId")}
           />
           <Input
             label="Google Tag Manager ID"
             name="gtmContainerId"
-            defaultValue={settings.gtmContainerId}
+            defaultValue={kept("gtmContainerId", settings.gtmContainerId)}
             placeholder="GTM-XXXXXXX"
             error={error("gtmContainerId")}
           />
           <Input
             label="Meta Pixel ID"
             name="metaPixelId"
-            defaultValue={settings.metaPixelId}
+            defaultValue={kept("metaPixelId", settings.metaPixelId)}
             placeholder="123456789012345"
             hint="For Facebook and Instagram campaign tracking."
             error={error("metaPixelId")}

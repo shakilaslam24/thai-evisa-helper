@@ -7,6 +7,15 @@ export type ActionState = {
   status: "idle" | "success" | "error";
   message?: string;
   fieldErrors?: Record<string, string>;
+  /**
+   * What the editor actually submitted.
+   *
+   * A Server Action re-renders the form, and every field is populated from
+   * `defaultValue` — which still holds the last SAVED values. Without this, a
+   * single validation error silently discards a long form the editor had just
+   * filled in. Forms read these back so nothing typed is ever lost.
+   */
+  values?: Record<string, string>;
 };
 
 export const IDLE: ActionState = { status: "idle" };
@@ -15,8 +24,21 @@ export function ok(message: string): ActionState {
   return { status: "success", message };
 }
 
-export function fail(message: string, fieldErrors?: Record<string, string>): ActionState {
-  return { status: "error", message, fieldErrors };
+export function fail(
+  message: string,
+  fieldErrors?: Record<string, string>,
+  values?: Record<string, string>,
+): ActionState {
+  return { status: "error", message, fieldErrors, values };
+}
+
+/** Flattens FormData into plain strings, so a failed submit can be replayed. */
+export function formValues(formData: FormData): Record<string, string> {
+  const values: Record<string, string> = {};
+  for (const [key, value] of formData.entries()) {
+    if (typeof value === "string" && key !== "password") values[key] = value;
+  }
+  return values;
 }
 
 /** Runs a Zod schema over FormData and maps issues to field-level messages. */
@@ -40,7 +62,10 @@ export function parseForm<T extends z.ZodType>(
     const key = issue.path.join(".");
     if (key && !fieldErrors[key]) fieldErrors[key] = issue.message;
   }
-  return { success: false, state: fail("Please check the highlighted fields.", fieldErrors) };
+  return {
+    success: false,
+    state: fail("Please check the highlighted fields.", fieldErrors, formValues(formData)),
+  };
 }
 
 /**

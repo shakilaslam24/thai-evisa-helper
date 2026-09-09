@@ -3,7 +3,7 @@ import Link from "next/link";
 import { FOOTER_COMPANY_LINKS, FOOTER_SERVICE_LINKS } from "@/lib/nav";
 import { IconMail, IconPhone, IconPin } from "@/components/ui/icons";
 import type { SiteSettings } from "@/lib/settings";
-import { telHref } from "@/lib/settings";
+import { numberLabel, telHref } from "@/lib/settings";
 
 const SOCIALS = [
   { key: "facebookUrl", label: "Facebook" },
@@ -16,7 +16,10 @@ const SOCIALS = [
 export function SiteFooter({ settings }: { settings: SiteSettings }) {
   const year = new Date().getFullYear();
   const socials = SOCIALS.map((s) => ({ ...s, url: settings[s.key] })).filter((s) => s.url);
-  const phones = [settings.primaryPhone, settings.secondaryPhone].filter(Boolean);
+  const phones = settings.footerPhones;
+  // A label only earns its place when it distinguishes one number from another.
+  const showPhoneLabels = new Set(phones.map((phone) => numberLabel(phone))).size > 1;
+  const emails = settings.footerEmails;
 
   return (
     <footer className="on-navy panel-navy-deep mobile-bar-offset">
@@ -70,27 +73,34 @@ export function SiteFooter({ settings }: { settings: SiteSettings }) {
             </h2>
             <ul className="mt-5 space-y-3.5 text-[0.9375rem]">
               {phones.map((phone) => (
-                <li key={phone}>
+                <li key={phone.id}>
                   <a
-                    href={telHref(phone)}
+                    href={telHref(phone.number)}
                     className="inline-flex min-h-[28px] items-start gap-2.5 text-on-navy-muted transition-colors hover:text-white"
                   >
                     <IconPhone width={17} height={17} className="mt-0.5 shrink-0 text-gold-300" />
-                    <span>{phone}</span>
+                    <span>
+                      {phone.number}
+                      {showPhoneLabels ? (
+                        <span className="block text-[0.75rem] text-on-navy-subtle">
+                          {numberLabel(phone)}
+                        </span>
+                      ) : null}
+                    </span>
                   </a>
                 </li>
               ))}
-              {settings.email ? (
-                <li>
+              {emails.map((entry) => (
+                <li key={entry.id}>
                   <a
-                    href={`mailto:${settings.email}`}
+                    href={`mailto:${entry.address}`}
                     className="inline-flex min-h-[28px] items-start gap-2.5 break-all text-on-navy-muted transition-colors hover:text-white"
                   >
                     <IconMail width={17} height={17} className="mt-0.5 shrink-0 text-gold-300" />
-                    <span>{settings.email}</span>
+                    <span>{entry.address}</span>
                   </a>
                 </li>
-              ) : null}
+              ))}
               {settings.addressLines.length > 0 ? (
                 <li className="flex items-start gap-2.5 text-on-navy-muted">
                   <IconPin width={17} height={17} className="mt-0.5 shrink-0 text-gold-300" />
@@ -103,7 +113,15 @@ export function SiteFooter({ settings }: { settings: SiteSettings }) {
                   </address>
                 </li>
               ) : null}
-              {settings.officeHours ? (
+              {settings.officeHourRows.length > 0 ? (
+                <li className="pt-1 text-[0.875rem] text-on-navy-subtle">
+                  {settings.officeHourRows.map((hour) => (
+                    <span key={hour.id} className="block">
+                      {hour.label}: {hour.value}
+                    </span>
+                  ))}
+                </li>
+              ) : settings.officeHours ? (
                 <li className="pt-1 text-[0.875rem] text-on-navy-subtle">{settings.officeHours}</li>
               ) : null}
             </ul>

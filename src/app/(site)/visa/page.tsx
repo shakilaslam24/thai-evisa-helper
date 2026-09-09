@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PageHero } from "@/components/site/page-hero";
+import { PageCampaign } from "@/components/site/page-campaign";
 import { MediaImage } from "@/components/ui/media-image";
 import { Reveal } from "@/components/ui/reveal";
 import { WhatsAppLink } from "@/components/site/whatsapp-link";
-import { getPageSeo, getPublishedVisas } from "@/lib/content";
+import { getActiveCampaign, getPageSeo, getPublishedVisas } from "@/lib/content";
 import { getSettings } from "@/lib/settings";
 import { breadcrumbSchema, buildMetadata, jsonLd } from "@/lib/seo";
 import { flagEmoji } from "@/lib/format";
@@ -25,6 +26,8 @@ export async function generateMetadata(): Promise<Metadata> {
       seo?.description ||
       "Visa assistance for tourist, business and visit applications. Explore requirements, documents and processing information by destination.",
     path: "/visa",
+    ogTitle: seo?.ogTitle,
+    ogDescription: seo?.ogDescription,
     imageUrl: seo?.ogImage?.url,
     canonicalUrl: seo?.canonicalUrl,
     noindex: seo?.noindex,
@@ -32,7 +35,11 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function VisaListingPage() {
-  const [destinations, settings] = await Promise.all([getPublishedVisas(), getSettings()]);
+  const [destinations, settings, campaign] = await Promise.all([
+    getPublishedVisas(),
+    getSettings(),
+    getActiveCampaign("visa"),
+  ]);
   const schema = jsonLd(breadcrumbSchema(settings.origin, CRUMBS));
 
   return (
@@ -44,6 +51,8 @@ export default async function VisaListingPage() {
         description="Explore visa information by destination. Requirements, documents and processing times are published for each country we currently assist with."
         crumbs={CRUMBS}
       />
+
+      <PageCampaign campaign={campaign} />
 
       <section className="section">
         <div className="container-df">

@@ -7,14 +7,24 @@ import { NAV_ITEMS, isActivePath } from "@/lib/nav";
 import { IconClose, IconMenu, IconPhone, IconWhatsApp } from "@/components/ui/icons";
 import { whatsappHref } from "@/lib/whatsapp";
 
+type HeaderPhone = { id: string; number: string; label: string; customLabel: string };
+
 type Props = {
   companyName: string;
   logoLightUrl: string;
   whatsappDigits: string;
   primaryPhone: string;
+  /** Numbers an administrator chose to surface in the header. */
+  headerPhones: HeaderPhone[];
 };
 
-export function SiteHeader({ companyName, logoLightUrl, whatsappDigits, primaryPhone }: Props) {
+export function SiteHeader({
+  companyName,
+  logoLightUrl,
+  whatsappDigits,
+  primaryPhone,
+  headerPhones,
+}: Props) {
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -103,6 +113,21 @@ export function SiteHeader({ companyName, logoLightUrl, whatsappDigits, primaryP
           </nav>
 
           <div className="flex items-center gap-2">
+            {headerPhones.length > 0 ? (
+              <span className="hidden items-center gap-3 pr-1 xl:flex">
+                {headerPhones.map((phone) => (
+                  <a
+                    key={phone.id}
+                    href={`tel:${phone.number.replace(/[^\d+]/g, "")}`}
+                    className="inline-flex min-h-[24px] items-center gap-1.5 text-[0.8125rem] font-medium text-ink-muted transition-colors hover:text-navy-900"
+                  >
+                    <IconPhone width={14} height={14} className="text-gold-500" />
+                    {phone.number}
+                  </a>
+                ))}
+              </span>
+            ) : null}
+
             {waHref ? (
               <a
                 href={waHref}

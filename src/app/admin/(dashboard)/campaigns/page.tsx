@@ -15,7 +15,9 @@ export default async function CampaignsPage() {
   const user = await requireAdmin();
 
   const [campaigns, media] = await Promise.all([
-    db.campaign.findMany({ orderBy: [{ active: "desc" }, { sortOrder: "asc" }, { createdAt: "desc" }] }),
+    db.campaign.findMany({
+      orderBy: [{ active: "desc" }, { sortOrder: "asc" }, { createdAt: "desc" }],
+    }),
     db.media.findMany({
       orderBy: { createdAt: "desc" },
       take: 300,
@@ -48,6 +50,8 @@ export default async function CampaignsPage() {
             startsAt: forInput(campaign.startsAt),
             endsAt: forInput(campaign.endsAt),
             active: campaign.active,
+            featured: campaign.featured,
+            displayLocation: campaign.displayLocation,
             sortOrder: campaign.sortOrder,
             isPlaceholder: campaign.isPlaceholder,
             desktopImageId: campaign.desktopImageId,

@@ -7,23 +7,32 @@ import { requireAdmin } from "@/lib/auth/guard";
 import { testimonialSchema } from "@/lib/validation/admin";
 import { ok, parseForm, revalidatePublic, type ActionState } from "@/lib/admin/actions";
 
-export async function saveTestimonialAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+export async function saveTestimonialAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
   const user = await requireAdmin();
   const id = String(formData.get("id") ?? "").trim();
 
   const parsed = parseForm(testimonialSchema, formData);
   if (!parsed.success) return parsed.state;
 
+  const { reviewDate, ...rest } = parsed.data;
+  const data = {
+    ...rest,
+    reviewDate: reviewDate.trim() ? new Date(`${reviewDate}T00:00:00`) : null,
+  };
+
   const saved = id
-    ? await db.testimonial.update({ where: { id }, data: parsed.data })
-    : await db.testimonial.create({ data: parsed.data });
+    ? await db.testimonial.update({ where: { id }, data })
+    : await db.testimonial.create({ data });
 
   await audit({
     user,
     action: id ? "update" : "create",
     entityType: "Testimonial",
     entityId: saved.id,
-    summary: `${id ? "Updated" : "Added"} testimonial from ${parsed.data.authorName}`,
+    summary: `${id ? "Updated" : "Added"} testimonial from ${data.authorName}`,
   });
 
   revalidatePath("/admin/testimonials");
@@ -36,7 +45,10 @@ export async function toggleTestimonialAction(formData: FormData): Promise<void>
   const id = String(formData.get("id") ?? "");
   if (!id) return;
 
-  const row = await db.testimonial.findUnique({ where: { id }, select: { published: true, authorName: true } });
+  const row = await db.testimonial.findUnique({
+    where: { id },
+    select: { published: true, authorName: true },
+  });
   if (!row) return;
 
   await db.testimonial.update({ where: { id }, data: { published: !row.published } });

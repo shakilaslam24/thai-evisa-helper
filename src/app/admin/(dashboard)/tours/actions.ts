@@ -6,7 +6,14 @@ import { db } from "@/lib/db";
 import { audit } from "@/lib/audit";
 import { requireAdmin } from "@/lib/auth/guard";
 import { tourSchema } from "@/lib/validation/admin";
-import { fail, ok, parseForm, revalidatePublic, type ActionState } from "@/lib/admin/actions";
+import {
+  fail,
+  formValues,
+  ok,
+  parseForm,
+  revalidatePublic,
+  type ActionState,
+} from "@/lib/admin/actions";
 import { itineraryRowSchema, parseLines, parseRows } from "@/lib/admin/rows";
 import { slugify } from "@/lib/format";
 
@@ -28,9 +35,13 @@ export async function saveTourAction(_prev: ActionState, formData: FormData): Pr
     select: { id: true },
   });
   if (clash) {
-    return fail("That URL slug is already used by another package.", {
-      slug: "Choose a different slug.",
-    });
+    return fail(
+      "That URL slug is already used by another package.",
+      {
+        slug: "Choose a different slug.",
+      },
+      formValues(formData),
+    );
   }
 
   const highlights = parseLines(formData.get("highlights"));
@@ -59,6 +70,8 @@ export async function saveTourAction(_prev: ActionState, formData: FormData): Pr
     isPlaceholder: input.isPlaceholder,
     seoTitle: input.seoTitle,
     seoDescription: input.seoDescription,
+    ogTitle: input.ogTitle,
+    ogDescription: input.ogDescription,
     canonicalUrl: input.canonicalUrl,
     noindex: input.noindex,
     coverImageId: input.coverImageId,
@@ -163,7 +176,10 @@ export async function deleteTourAction(formData: FormData): Promise<void> {
   const id = String(formData.get("id") ?? "");
   if (!id) return;
 
-  const removed = await db.tourPackage.delete({ where: { id }, select: { slug: true, name: true } });
+  const removed = await db.tourPackage.delete({
+    where: { id },
+    select: { slug: true, name: true },
+  });
   await audit({
     user,
     action: "delete",

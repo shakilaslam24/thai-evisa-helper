@@ -86,10 +86,9 @@ model GlobalSettings {
   logoDarkId  String? // logo used on dark backgrounds (white ink)
   faviconId   String?
 
-  primaryPhone   String @default("")
-  secondaryPhone String @default("")
-  whatsappNumber String @default("") // digits only, international format
-  email          String @default("")
+  // Phone numbers and email addresses are NOT fixed columns — they live in the
+  // repeatable ContactNumber / ContactEmail models below, so staff can add a
+  // hotline or a B2B line without a code change.
 
   addressLine1 String @default("")
   addressLine2 String @default("")
@@ -105,8 +104,15 @@ model GlobalSettings {
   youtubeUrl   String @default("")
   linkedinUrl  String @default("")
 
+  // A single free-text line, kept as a fallback. Structured, repeatable rows
+  // live in OfficeHour.
   officeHours String @default("")
   footerText  String @default("")
+
+  // Search Console / Webmaster verification tokens. Pasting one here emits the
+  // correct meta tag site-wide — no source edit needed (brief §20).
+  googleSiteVerification String @default("")
+  bingSiteVerification   String @default("")
 
   gaMeasurementId String @default("")
   gtmContainerId  String @default("")
@@ -127,6 +133,62 @@ model GlobalSettings {
 }
 
 // ---------------------------------------------------------------------------
+// Contact channels — repeatable, so a new hotline or B2B line is an admin task
+// rather than a code change (brief §4).
+// ---------------------------------------------------------------------------
+
+model ContactNumber {
+  id    String @id @default(cuid())
+  label String @default("Main Office") // Main Office | WhatsApp | Hotline | B2B | Support | Other
+  customLabel String @default("") // used when label = "Other"
+  number      String
+
+  /// Digits-only international form, e.g. 8801335374437. Required for wa.me links.
+  whatsappNumber  String  @default("")
+  whatsappEnabled Boolean @default(false)
+
+  /// Exactly one number is the primary phone, and one the primary WhatsApp.
+  isPrimary         Boolean @default(false)
+  isPrimaryWhatsapp Boolean @default(false)
+
+  showInHeader    Boolean @default(false)
+  showInFooter    Boolean @default(true)
+  showOnContact   Boolean @default(true)
+  showInMobileBar Boolean @default(false)
+
+  archived  Boolean @default(false)
+  sortOrder Int     @default(0)
+
+  @@index([archived, sortOrder])
+}
+
+model ContactEmail {
+  id      String @id @default(cuid())
+  label   String @default("General")
+  address String
+
+  isPrimary     Boolean @default(false)
+  showInFooter  Boolean @default(true)
+  showOnContact Boolean @default(true)
+
+  archived  Boolean @default(false)
+  sortOrder Int     @default(0)
+
+  @@index([archived, sortOrder])
+}
+
+model OfficeHour {
+  id        String  @id @default(cuid())
+  label     String // e.g. "Saturday – Thursday"
+  value     String // e.g. "10:00 AM – 7:00 PM"
+  note      String  @default("")
+  published Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  @@index([published, sortOrder])
+}
+
+// ---------------------------------------------------------------------------
 // Media library
 // ---------------------------------------------------------------------------
 
@@ -140,6 +202,8 @@ model Media {
   width       Int?
   height      Int?
   altText     String   @default("")
+  title       String   @default("")
+  caption     String   @default("")
   uploadedById String?
   createdAt   DateTime @default(now())
 
@@ -279,6 +343,8 @@ model VisaDestination {
 
   seoTitle       String  @default("")
   seoDescription String  @default("")
+  ogTitle        String  @default("")
+  ogDescription  String  @default("")
   ogImageId      String?
   canonicalUrl   String  @default("")
   noindex        Boolean @default(false)
@@ -367,6 +433,8 @@ model TourPackage {
 
   seoTitle       String  @default("")
   seoDescription String  @default("")
+  ogTitle        String  @default("")
+  ogDescription  String  @default("")
   ogImageId      String?
   canonicalUrl   String  @default("")
   noindex        Boolean @default(false)
@@ -450,6 +518,9 @@ model Campaign {
   startsAt    DateTime?
   endsAt      DateTime?
   active      Boolean @default(false)
+  featured    Boolean @default(false)
+  // Where this runs: "homepage" | "announcement_bar" | "visa" | "tours" | "b2b"
+  displayLocation String @default("homepage")
   sortOrder   Int     @default(0)
   isPlaceholder Boolean @default(false)
 
@@ -459,7 +530,7 @@ model Campaign {
   desktopImage Media? @relation("CampaignDesktop", fields: [desktopImageId], references: [id], onDelete: SetNull)
   mobileImage  Media? @relation("CampaignMobile", fields: [mobileImageId], references: [id], onDelete: SetNull)
 
-  @@index([active, sortOrder])
+  @@index([active, displayLocation, sortOrder])
 }
 
 // ---------------------------------------------------------------------------
@@ -473,6 +544,8 @@ model Testimonial {
   authorTitle String  @default("")
   quote       String
   serviceType String  @default("")
+  destination String  @default("")
+  reviewDate  DateTime?
   rating      Int? // 1–5, optional
   avatarId    String?
   published   Boolean @default(false)
@@ -548,6 +621,10 @@ model PageSeo {
   pageKey     String  @unique // "home" | "visa" | "tours" | "air-ticket-hotel" | "b2b" | "about" | "contact"
   title       String  @default("")
   description String  @default("")
+  // Social copy, separate from the search-result copy. Empty falls back to the
+  // SEO title/description above.
+  ogTitle       String @default("")
+  ogDescription String @default("")
   ogImageId   String?
   canonicalUrl String @default("")
   noindex     Boolean @default(false)

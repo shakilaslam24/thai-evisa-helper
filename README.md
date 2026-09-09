@@ -44,7 +44,13 @@ node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
 | `npm run dev` | Development server |
 | `npm run build` | Generate the client, apply migrations, build for production |
 | `npm start` | Run the production build |
-| `npm test` | Unit tests (39 assertions over auth, validation, parsing, rate limiting) |
+| `npm test` | Unit tests — auth, validation, parsing, rate limiting, CRM isolation |
+| `npm run test:e2e` | Public flows against a running server |
+| `npm run test:admin` | Every admin module: create, edit, publish, delete |
+| `npm run test:security` | Access control, headers, injection, rate limiting |
+| `npm run test:a11y` | Accessibility plus admin responsiveness |
+| `npm run test:audit` | Every page at 8 widths, 320px → 1920px |
+| `npm run demo:load` / `demo:list` / `demo:clear` | Demo content for design review |
 | `npm run typecheck` | TypeScript, no emit |
 | `npm run db:migrate` | Create and apply a migration in development |
 | `npm run db:deploy` | Apply pending migrations (production) |
@@ -62,6 +68,7 @@ node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Stack, data model, routes, design system, the CRM boundary |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Server setup, environment, PostgreSQL migration, backups |
 | [docs/ADMIN-GUIDE.md](docs/ADMIN-GUIDE.md) | How the DreamFly team manages the site day to day |
+| [docs/PRE-LAUNCH.md](docs/PRE-LAUNCH.md) | Checklist to work through before going live |
 | [docs/SECURITY.md](docs/SECURITY.md) | Security model and checklist |
 
 ---
@@ -76,6 +83,11 @@ the editor once the record holds real data.
 **2. Nothing about DreamFly is hard-coded.** Phone numbers, WhatsApp, address,
 social links, analytics IDs and SEO defaults all come from **Global Settings**.
 Change them there and every page updates.
+
+Phone numbers, email addresses and office hours are **repeatable rows**, not
+fixed fields — adding a hotline or a B2B line is an admin task, never a code
+change. Each number carries its own label, its own WhatsApp switch, and its own
+choice of where it appears.
 
 ---
 

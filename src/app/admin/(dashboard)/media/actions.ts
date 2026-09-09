@@ -80,7 +80,11 @@ export async function updateMediaAction(
 
   await db.media.update({
     where: { id: parsed.data.id },
-    data: { altText: parsed.data.altText },
+    data: {
+      altText: parsed.data.altText,
+      title: parsed.data.title,
+      caption: parsed.data.caption,
+    },
   });
 
   await audit({
@@ -88,7 +92,7 @@ export async function updateMediaAction(
     action: "update",
     entityType: "Media",
     entityId: parsed.data.id,
-    summary: "Updated image alt text",
+    summary: "Updated image details",
   });
 
   revalidatePath("/admin/media");

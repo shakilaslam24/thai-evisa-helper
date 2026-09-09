@@ -51,9 +51,9 @@ export default async function AdminDashboard() {
   /** Onboarding checks — real gaps only, no busywork. */
   const setupTasks = [
     {
-      done: Boolean(settings.whatsappNumber),
+      done: Boolean(settings.whatsappDigits),
       label: "Add the primary WhatsApp number",
-      href: "/admin/settings",
+      href: "/admin/settings#contact",
       why: "Every WhatsApp button on the site is hidden until this is set.",
     },
     {

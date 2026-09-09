@@ -4,6 +4,7 @@ import { IconPhone, IconPin, IconWhatsApp } from "@/components/ui/icons";
 import { whatsappHref } from "@/lib/whatsapp";
 
 type Props = {
+  /** The number the Call button dials — flagged for the mobile bar, else the main one. */
   primaryPhone: string;
   whatsappDigits: string;
   mapsUrl: string;

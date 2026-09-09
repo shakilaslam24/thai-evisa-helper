@@ -19,7 +19,15 @@
     "backup": "tsx scripts/backup.ts",
     "test": "node --import tsx --test tests/*.test.ts",
     "test:e2e": "node tests/e2e/flows.mjs",
-    "test:audit": "node tests/e2e/responsive-audit.mjs"
+    "test:audit": "node tests/e2e/responsive-audit.mjs",
+    "demo:load": "tsx scripts/demo-content.ts load",
+    "demo:list": "tsx scripts/demo-content.ts list",
+    "demo:clear": "tsx scripts/demo-content.ts clear",
+    "demo:show": "tsx scripts/demo-content.ts show",
+    "demo:hide": "tsx scripts/demo-content.ts hide",
+    "test:admin": "node tests/e2e/admin-modules.mjs",
+    "test:security": "node tests/e2e/security-audit.mjs",
+    "test:a11y": "node tests/e2e/accessibility-audit.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

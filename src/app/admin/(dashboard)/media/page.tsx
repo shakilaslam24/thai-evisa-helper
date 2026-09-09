@@ -49,6 +49,8 @@ export default async function MediaPage() {
                   url: item.url,
                   originalName: item.originalName,
                   altText: item.altText,
+                  title: item.title,
+                  caption: item.caption,
                   mimeType: item.mimeType,
                   sizeLabel: formatBytes(item.sizeBytes),
                   dimensions: item.width && item.height ? `${item.width}×${item.height}` : "",

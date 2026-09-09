@@ -22,6 +22,8 @@ export type TestimonialRow = {
   authorTitle: string;
   quote: string;
   serviceType: string;
+  destination: string;
+  reviewDate: string;
   rating: number | null;
   published: boolean;
   sortOrder: number;
@@ -35,6 +37,8 @@ const BLANK: TestimonialRow = {
   authorTitle: "",
   quote: "",
   serviceType: "",
+  destination: "",
+  reviewDate: "",
   rating: null,
   published: false,
   sortOrder: 0,

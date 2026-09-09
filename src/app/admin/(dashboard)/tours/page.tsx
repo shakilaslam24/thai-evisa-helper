@@ -1,7 +1,15 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth/guard";
-import { DataTable, EmptyState, PageBody, PageHeader, Panel, SampleBadge, StatusBadge } from "@/components/admin/ui";
+import {
+  DataTable,
+  EmptyState,
+  PageBody,
+  PageHeader,
+  Panel,
+  SampleBadge,
+  StatusBadge,
+} from "@/components/admin/ui";
 import { createTourAction, setTourStatusAction } from "./actions";
 import { formatDate } from "@/lib/format";
 import { AVAILABILITY, PACKAGE_TYPES, labelFor } from "@/lib/list";
@@ -24,7 +32,9 @@ export default async function ToursListPage() {
 
       <PageBody>
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,18rem)] lg:items-start">
-          <div>
+          {/* min-w-0: without it this grid child widens to fit the table and
+              takes the page with it, instead of the table scrolling itself. */}
+          <div className="min-w-0">
             {tours.length === 0 ? (
               <EmptyState
                 title="No packages yet"
@@ -58,16 +68,26 @@ export default async function ToursListPage() {
                     <td className="px-4 py-3 text-[0.8125rem] text-ink-muted">
                       {labelFor(AVAILABILITY, tour.availability)}
                     </td>
-                    <td className="px-4 py-3 text-[0.8125rem] text-ink-subtle">{formatDate(tour.updatedAt)}</td>
+                    <td className="px-4 py-3 text-[0.8125rem] text-ink-subtle">
+                      {formatDate(tour.updatedAt)}
+                    </td>
                     <td className="px-4 py-3 text-right">
                       <form action={setTourStatusAction} className="inline">
                         <input type="hidden" name="id" value={tour.id} />
-                        <input type="hidden" name="status" value={tour.status === "published" ? "draft" : "published"} />
+                        <input
+                          type="hidden"
+                          name="status"
+                          value={tour.status === "published" ? "draft" : "published"}
+                        />
                         <button
                           type="submit"
                           className="btn btn-outline btn-sm"
                           disabled={tour.isPlaceholder && tour.status !== "published"}
-                          title={tour.isPlaceholder ? "Clear the sample flag in the editor before publishing." : undefined}
+                          title={
+                            tour.isPlaceholder
+                              ? "Clear the sample flag in the editor before publishing."
+                              : undefined
+                          }
                         >
                           {tour.status === "published" ? "Unpublish" : "Publish"}
                         </button>

@@ -1,9 +1,9 @@
-import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth/guard";
 import { PageBody, PageHeader, Panel } from "@/components/admin/ui";
 import { PageSeoForm } from "@/components/admin/seo-form";
 import { getSettings } from "@/lib/settings";
+import { SearchConsolePanel } from "@/components/admin/search-console-panel";
 
 export const metadata = { title: "SEO" };
 
@@ -20,7 +20,8 @@ const PAGES = [
 export default async function SeoPage() {
   await requireAdmin();
 
-  const [rows, media, settings] = await Promise.all([
+  const now = new Date();
+  const [rows, media, settings, visaCount, tourCount] = await Promise.all([
     db.pageSeo.findMany(),
     db.media.findMany({
       orderBy: { createdAt: "desc" },
@@ -28,7 +29,15 @@ export default async function SeoPage() {
       select: { id: true, url: true, originalName: true, altText: true },
     }),
     getSettings(),
+    db.visaDestination.count({
+      where: { status: "published", isPlaceholder: false, noindex: false },
+    }),
+    db.tourPackage.count({ where: { status: "published", isPlaceholder: false, noindex: false } }),
   ]);
+
+  // Seven fixed marketing routes, plus every indexable visa and tour page.
+  const staticRouteCount = 7;
+  const sitemapUrlCount = settings.allowIndexing ? staticRouteCount + visaCount + tourCount : 0;
 
   const byKey = new Map(rows.map((row) => [row.pageKey, row]));
 
@@ -41,38 +50,19 @@ export default async function SeoPage() {
 
       <PageBody>
         <div className="grid max-w-4xl gap-6">
-          <Panel title="Site-wide">
-            <dl className="grid gap-3 text-[0.875rem] sm:grid-cols-2">
-              <Fact
-                label="Search indexing"
-                value={settings.allowIndexing ? "Enabled" : "Disabled"}
-              />
-              <Fact label="Site URL" value={settings.origin} />
-              <Fact label="Default title" value={settings.defaultSeoTitle || "— not set —"} />
-              <Fact
-                label="Default description"
-                value={settings.defaultSeoDescription || "— not set —"}
-              />
-            </dl>
-            <p className="mt-5 border-t border-line pt-4 text-[0.8125rem] text-ink-muted">
-              These are edited in{" "}
-              <Link
-                href="/admin/settings"
-                className="font-medium text-ink underline underline-offset-4"
-              >
-                Global Settings
-              </Link>
-              . Visa and tour pages carry their own SEO fields inside each record.
-            </p>
-            <p className="mt-3 flex flex-wrap gap-4 text-[0.8125rem]">
-              <a href="/sitemap.xml" target="_blank" rel="noopener" className="link-arrow">
-                View sitemap.xml
-              </a>
-              <a href="/robots.txt" target="_blank" rel="noopener" className="link-arrow">
-                View robots.txt
-              </a>
-            </p>
-          </Panel>
+          <SearchConsolePanel
+            origin={settings.origin}
+            allowIndexing={settings.allowIndexing}
+            googleVerified={Boolean(settings.googleSiteVerification.trim())}
+            bingVerified={Boolean(settings.bingSiteVerification.trim())}
+            sitemapUrlCount={sitemapUrlCount}
+            visaCount={visaCount}
+            tourCount={tourCount}
+            staticRouteCount={staticRouteCount}
+            defaultTitle={settings.defaultSeoTitle}
+            defaultDescription={settings.defaultSeoDescription}
+            generatedAt={now.toISOString()}
+          />
 
           {PAGES.map((page) => (
             <PageSeoForm
@@ -84,6 +74,8 @@ export default async function SeoPage() {
               seo={{
                 title: byKey.get(page.key)?.title ?? "",
                 description: byKey.get(page.key)?.description ?? "",
+                ogTitle: byKey.get(page.key)?.ogTitle ?? "",
+                ogDescription: byKey.get(page.key)?.ogDescription ?? "",
                 canonicalUrl: byKey.get(page.key)?.canonicalUrl ?? "",
                 noindex: byKey.get(page.key)?.noindex ?? false,
                 ogImageId: byKey.get(page.key)?.ogImageId ?? null,
@@ -93,16 +85,5 @@ export default async function SeoPage() {
         </div>
       </PageBody>
     </>
-  );
-}
-
-function Fact({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-ink-subtle">
-        {label}
-      </dt>
-      <dd className="mt-0.5 break-words text-ink">{value}</dd>
-    </div>
   );
 }

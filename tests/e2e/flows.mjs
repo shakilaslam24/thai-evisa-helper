@@ -106,7 +106,8 @@ try {
   const bot = await anon.request.post(`${BASE}/api/enquiries`, {
     data: { type: "general", name: "Bot", phone: "01700000001", company_website: "http://spam.example" },
   });
-  log("honeypot accepted-but-discarded", bot.status() === 200, `status=${bot.status()}`);
+  // 429 means the limiter answered first — also a silent refusal, never a save.
+  log("honeypot accepted-but-discarded", [200, 429].includes(bot.status()), `status=${bot.status()}`);
 
   // --- the enquiry API never leaks data ------------------------------------
   const leak = await anon.request.get(`${BASE}/api/enquiries`);
@@ -136,9 +137,18 @@ try {
 
   // --- robots + sitemap ----------------------------------------------------
   const robots = await (await anon.request.get(`${BASE}/robots.txt`)).text();
-  log("robots.txt blocks admin", robots.includes("/admin"), robots.split("\n").filter(Boolean).slice(0,4).join(" | "));
   const sitemap = await (await anon.request.get(`${BASE}/sitemap.xml`)).text();
-  log("sitemap lists the published visa page", sitemap.includes("/visa/japan"));
+
+  // `npm run demo:show` switches indexing off on purpose while demo content is
+  // exposed, so check whichever behaviour the current setting calls for.
+  const indexingOff = /Disallow:\s*\/\s*$/m.test(robots) && !robots.includes("Allow:");
+  if (indexingOff) {
+    log("indexing off: robots blocks everything", robots.includes("Disallow: /"));
+    log("indexing off: sitemap is empty", !sitemap.includes("<loc>"));
+  } else {
+    log("robots.txt blocks admin", robots.includes("/admin"), robots.split("\n").filter(Boolean).slice(0, 4).join(" | "));
+    log("sitemap lists the published visa page", sitemap.includes("/visa/japan"));
+  }
 
   await anon.close();
 } catch (error) {

@@ -5,6 +5,9 @@ import { getSettings } from "./settings";
 type SeoInput = {
   title?: string;
   description?: string;
+  /** Social copy; falls back to the title/description above when empty. */
+  ogTitle?: string;
+  ogDescription?: string;
   path?: string;
   imageUrl?: string | null;
   canonicalUrl?: string;
@@ -39,8 +42,19 @@ export async function buildMetadata(input: SeoInput = {}): Promise<Metadata> {
   const image = absolute(origin, input.imageUrl || settings.socialImageUrl);
   const indexable = settings.allowIndexing && !input.noindex;
 
+  // Search Console / Bing verification. Emitted only once an administrator has
+  // pasted a token in Global Settings — no source edit required (brief §20).
+  const verification: NonNullable<Metadata["verification"]> = {};
+  if (settings.googleSiteVerification.trim()) {
+    verification.google = settings.googleSiteVerification.trim();
+  }
+  if (settings.bingSiteVerification.trim()) {
+    verification.other = { "msvalidate.01": settings.bingSiteVerification.trim() };
+  }
+
   return {
     metadataBase: new URL(origin),
+    verification: Object.keys(verification).length > 0 ? verification : undefined,
     title,
     description: description || undefined,
     alternates: { canonical },
@@ -54,16 +68,16 @@ export async function buildMetadata(input: SeoInput = {}): Promise<Metadata> {
     openGraph: {
       type: input.type ?? "website",
       siteName: brand,
-      title,
-      description: description || undefined,
+      title: input.ogTitle?.trim() || title,
+      description: input.ogDescription?.trim() || description || undefined,
       url: canonical,
       images: [{ url: image, width: 1200, height: 630, alt: brand }],
       locale: "en_US",
     },
     twitter: {
       card: "summary_large_image",
-      title,
-      description: description || undefined,
+      title: input.ogTitle?.trim() || title,
+      description: input.ogDescription?.trim() || description || undefined,
       images: [image],
     },
   };
@@ -93,7 +107,7 @@ export async function organizationSchema() {
     image: `${s.origin}${s.socialImageUrl}`,
     description: s.defaultSeoDescription || undefined,
     email: s.email || undefined,
-    telephone: [s.primaryPhone, s.secondaryPhone].filter(Boolean),
+    telephone: s.phones.map((phone) => phone.number).filter(Boolean),
     address: s.addressLines.length
       ? {
           "@type": "PostalAddress",
@@ -102,7 +116,10 @@ export async function organizationSchema() {
           addressCountry: s.country || undefined,
         }
       : undefined,
-    openingHours: s.officeHours || undefined,
+    openingHours:
+      s.officeHourRows.length > 0
+        ? s.officeHourRows.map((hour) => `${hour.label} ${hour.value}`)
+        : s.officeHours || undefined,
     sameAs: sameAs.length ? sameAs : undefined,
   };
 }

@@ -35,7 +35,9 @@ export default async function VisaListPage() {
 
       <PageBody>
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,18rem)] lg:items-start">
-          <div>
+          {/* min-w-0: without it this grid child widens to fit the table and
+              takes the page with it, instead of the table scrolling itself. */}
+          <div className="min-w-0">
             {destinations.length === 0 ? (
               <EmptyState
                 title="No destinations yet"

@@ -25,7 +25,13 @@ export const env = {
   // Must match the default in prisma.config.ts, or migrations and the running
   // app would point at two different files.
   databaseUrl: process.env.DATABASE_URL ?? "file:./data/dreamfly.db",
-  siteUrl: (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(/\/+$/, ""),
+  // Required in production: a missing value would publish localhost canonical
+  // URLs, a localhost sitemap and localhost Open Graph tags — silently, and to
+  // Google. Better to refuse to start.
+  siteUrl: (isProduction
+    ? required("NEXT_PUBLIC_SITE_URL", process.env.NEXT_PUBLIC_SITE_URL)
+    : (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000")
+  ).replace(/\/+$/, ""),
   sessionSecret: isProduction
     ? required("SESSION_SECRET", process.env.SESSION_SECRET)
     : process.env.SESSION_SECRET?.trim() || DEV_SESSION_SECRET,

@@ -5,7 +5,7 @@ import { ContactForm } from "@/components/forms/contact-form";
 import { WhatsAppLink } from "@/components/site/whatsapp-link";
 import { IconMail, IconPhone, IconPin, IconWhatsApp } from "@/components/ui/icons";
 import { getPageSeo } from "@/lib/content";
-import { getSettings, telHref } from "@/lib/settings";
+import { getSettings, numberLabel, telHref } from "@/lib/settings";
 import { breadcrumbSchema, buildMetadata, jsonLd } from "@/lib/seo";
 
 export const revalidate = 300;
@@ -24,6 +24,8 @@ export async function generateMetadata(): Promise<Metadata> {
       seo?.description ||
       `Call, WhatsApp, email or visit ${settings.companyName} in Gulshan, Dhaka. We reply to every enquiry.`,
     path: "/contact",
+    ogTitle: seo?.ogTitle,
+    ogDescription: seo?.ogDescription,
     imageUrl: seo?.ogImage?.url,
     canonicalUrl: seo?.canonicalUrl,
     noindex: seo?.noindex,
@@ -33,7 +35,9 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function ContactPage() {
   const settings = await getSettings();
   const schema = jsonLd(breadcrumbSchema(settings.origin, CRUMBS));
-  const phones = [settings.primaryPhone, settings.secondaryPhone].filter(Boolean);
+  const phones = settings.contactPhones;
+  const showPhoneLabels = new Set(phones.map((phone) => numberLabel(phone))).size > 1;
+  const emails = settings.contactEmails;
 
   return (
     <>
@@ -57,15 +61,20 @@ export default async function ContactPage() {
                     label="Call Us"
                     className="bg-surface"
                   >
-                    <ul className="space-y-1">
+                    <ul className="space-y-2">
                       {phones.map((phone) => (
-                        <li key={phone}>
+                        <li key={phone.id}>
                           <a
-                            href={telHref(phone)}
+                            href={telHref(phone.number)}
                             className="inline-flex min-h-[28px] items-center font-display text-[1.0625rem] font-semibold tracking-[-0.015em] text-ink underline-offset-4 hover:text-gold-600 hover:underline"
                           >
-                            {phone}
+                            {phone.number}
                           </a>
+                          {showPhoneLabels ? (
+                            <span className="block text-[0.8125rem] text-ink-subtle">
+                              {numberLabel(phone)}
+                            </span>
+                          ) : null}
                         </li>
                       ))}
                     </ul>
@@ -117,7 +126,16 @@ export default async function ContactPage() {
                         </span>
                       ))}
                     </address>
-                    {settings.officeHours ? (
+                    {settings.officeHourRows.length > 0 ? (
+                      <dl className="mt-3 space-y-1 text-[0.875rem]">
+                        {settings.officeHourRows.map((hour) => (
+                          <div key={hour.id} className="flex flex-wrap gap-x-2">
+                            <dt className="text-ink-subtle">{hour.label}</dt>
+                            <dd className="font-medium text-ink">{hour.value}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    ) : settings.officeHours ? (
                       <p className="mt-2 text-[0.875rem] text-ink-subtle">{settings.officeHours}</p>
                     ) : null}
                     {settings.googleMapsUrl ? (

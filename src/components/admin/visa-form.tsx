@@ -18,6 +18,9 @@ import { MediaPicker, type MediaOption } from "./media-picker";
 import { Panel } from "./ui";
 import { Repeatable, type RepeatableRow } from "./repeatable";
 import { IDLE_STATE } from "./action-state";
+import { UnsavedGuard } from "./unsaved-guard";
+import { RestoreValues } from "./restore-values";
+import { replayed } from "./use-form-values";
 import { CONTENT_STATUS, ENTRY_TYPES, VISA_CATEGORIES, VISA_FORMATS } from "@/lib/list";
 
 type VisaFormData = {
@@ -44,6 +47,8 @@ type VisaFormData = {
   isPlaceholder: boolean;
   seoTitle: string;
   seoDescription: string;
+  ogTitle: string;
+  ogDescription: string;
   canonicalUrl: string;
   noindex: boolean;
   coverImageId: string | null;
@@ -66,6 +71,9 @@ export function VisaForm({
 }) {
   const [state, action] = useActionState(saveVisaAction, IDLE_STATE);
   const error = (field: string) => state.fieldErrors?.[field];
+  // After a failed save, show what the editor typed rather than the stale
+  // saved value — otherwise one validation error wipes the whole form.
+  const kept = replayed(state);
 
   return (
     <>
@@ -81,20 +89,23 @@ export function VisaForm({
 
       <form action={action} className="grid max-w-4xl gap-6">
         <input type="hidden" name="id" value={visa.id} />
+        <UnsavedGuard />
+        <RestoreValues state={state} />
+        <RestoreValues state={state} />
 
         <Panel title="Destination">
           <FieldGrid>
             <Input
               label="Country name"
               name="countryName"
-              defaultValue={visa.countryName}
+              defaultValue={kept("countryName", visa.countryName)}
               required
               error={error("countryName")}
             />
             <Input
               label="URL slug"
               name="slug"
-              defaultValue={visa.slug}
+              defaultValue={kept("slug", visa.slug)}
               required
               hint="Appears in the address: /visa/your-slug"
               error={error("slug")}
@@ -102,7 +113,7 @@ export function VisaForm({
             <Input
               label="Country code"
               name="countryCode"
-              defaultValue={visa.countryCode}
+              defaultValue={kept("countryCode", visa.countryCode)}
               placeholder="JP"
               hint="Two letters (ISO). Draws the flag next to the country name."
               error={error("countryCode")}
@@ -110,7 +121,7 @@ export function VisaForm({
             <Input
               label="Processing time"
               name="processingTime"
-              defaultValue={visa.processingTime}
+              defaultValue={kept("processingTime", visa.processingTime)}
               placeholder="e.g. 7–10 working days"
               hint="Enter exactly what DreamFly quotes. Shown on the card and the detail page."
               error={error("processingTime")}
@@ -120,7 +131,7 @@ export function VisaForm({
                 label="Introduction"
                 name="intro"
                 rows={5}
-                defaultValue={visa.intro}
+                defaultValue={kept("intro", visa.intro)}
                 hint="The first paragraph appears under the page title; any further paragraphs become the Overview section."
                 error={error("intro")}
               />
@@ -159,19 +170,19 @@ export function VisaForm({
             <Input
               label="DreamFly service charge"
               name="serviceCharge"
-              defaultValue={visa.serviceCharge}
+              defaultValue={kept("serviceCharge", visa.serviceCharge)}
               error={error("serviceCharge")}
             />
             <Input
               label="Embassy / government fee"
               name="embassyFee"
-              defaultValue={visa.embassyFee}
+              defaultValue={kept("embassyFee", visa.embassyFee)}
               error={error("embassyFee")}
             />
             <Input
               label="Other charges"
               name="otherCharges"
-              defaultValue={visa.otherCharges}
+              defaultValue={kept("otherCharges", visa.otherCharges)}
               error={error("otherCharges")}
             />
             <FullWidth>
@@ -179,7 +190,7 @@ export function VisaForm({
                 label="Fee note"
                 name="feeNote"
                 rows={2}
-                defaultValue={visa.feeNote}
+                defaultValue={kept("feeNote", visa.feeNote)}
                 hint="Shown under the fee table. Leave empty to use the standard note about authority-set fees."
                 error={error("feeNote")}
               />
@@ -218,7 +229,7 @@ export function VisaForm({
               label="Who can apply"
               name="eligibility"
               rows={5}
-              defaultValue={visa.eligibility}
+              defaultValue={kept("eligibility", visa.eligibility)}
               hint="One point per line. Rendered as a checklist."
               error={error("eligibility")}
             />
@@ -226,7 +237,7 @@ export function VisaForm({
               label="Application process"
               name="applicationProcess"
               rows={6}
-              defaultValue={visa.applicationProcess}
+              defaultValue={kept("applicationProcess", visa.applicationProcess)}
               hint="One step per line. Rendered as numbered steps."
               error={error("applicationProcess")}
             />
@@ -234,7 +245,7 @@ export function VisaForm({
               label="Important notes"
               name="importantNotes"
               rows={4}
-              defaultValue={visa.importantNotes}
+              defaultValue={kept("importantNotes", visa.importantNotes)}
               hint="One note per line. Shown in a highlighted box. Never promise approval — the decision rests with the embassy."
               error={error("importantNotes")}
             />
@@ -266,14 +277,14 @@ export function VisaForm({
               label="Cover image"
               name="coverImageId"
               options={media}
-              defaultValue={visa.coverImageId}
+              defaultValue={kept("coverImageId", visa.coverImageId)}
               hint="Used on the card and at the top of the page."
             />
             <MediaPicker
               label="Flag image"
               name="flagImageId"
               options={media}
-              defaultValue={visa.flagImageId}
+              defaultValue={kept("flagImageId", visa.flagImageId)}
               hint="Optional. The country code already draws a flag."
             />
           </FieldGrid>
@@ -284,7 +295,7 @@ export function VisaForm({
             label="Custom WhatsApp message"
             name="whatsappMessage"
             rows={2}
-            defaultValue={visa.whatsappMessage}
+            defaultValue={kept("whatsappMessage", visa.whatsappMessage)}
             hint={`Leave empty to use the default: "Hello DreamFly, I would like to know more about your ${visa.countryName} visa service."`}
             error={error("whatsappMessage")}
           />
@@ -296,7 +307,7 @@ export function VisaForm({
               <Input
                 label="SEO title"
                 name="seoTitle"
-                defaultValue={visa.seoTitle}
+                defaultValue={kept("seoTitle", visa.seoTitle)}
                 hint="Leave empty to use the country name."
                 error={error("seoTitle")}
               />
@@ -306,20 +317,39 @@ export function VisaForm({
                 label="SEO description"
                 name="seoDescription"
                 rows={3}
-                defaultValue={visa.seoDescription}
+                defaultValue={kept("seoDescription", visa.seoDescription)}
                 error={error("seoDescription")}
+              />
+            </FullWidth>
+            <FullWidth>
+              <Input
+                label="Social title"
+                name="ogTitle"
+                defaultValue={kept("ogTitle", visa.ogTitle)}
+                hint="Shown when the link is shared. Leave empty to reuse the SEO title."
+                error={error("ogTitle")}
+              />
+            </FullWidth>
+            <FullWidth>
+              <Textarea
+                label="Social description"
+                name="ogDescription"
+                rows={2}
+                defaultValue={kept("ogDescription", visa.ogDescription)}
+                hint="Leave empty to reuse the SEO description."
+                error={error("ogDescription")}
               />
             </FullWidth>
             <MediaPicker
               label="Social share image"
               name="ogImageId"
               options={media}
-              defaultValue={visa.ogImageId}
+              defaultValue={kept("ogImageId", visa.ogImageId)}
             />
             <Input
               label="Canonical URL"
               name="canonicalUrl"
-              defaultValue={visa.canonicalUrl}
+              defaultValue={kept("canonicalUrl", visa.canonicalUrl)}
               hint="Only if this page duplicates another."
               error={error("canonicalUrl")}
             />
@@ -339,14 +369,14 @@ export function VisaForm({
               label="Status"
               name="status"
               options={CONTENT_STATUS}
-              defaultValue={visa.status}
+              defaultValue={kept("status", visa.status)}
               error={error("status")}
             />
             <Input
               label="Featured order"
               name="featuredOrder"
               type="number"
-              defaultValue={visa.featuredOrder}
+              defaultValue={kept("featuredOrder", visa.featuredOrder)}
               hint="Lower numbers appear first on the homepage."
               error={error("featuredOrder")}
             />

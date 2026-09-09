@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PageHero } from "@/components/site/page-hero";
+import { PageCampaign } from "@/components/site/page-campaign";
 import { MediaImage } from "@/components/ui/media-image";
 import { Reveal } from "@/components/ui/reveal";
 import { IconArrowRight } from "@/components/ui/icons";
-import { getPageSeo, getPublishedTours } from "@/lib/content";
+import { getActiveCampaign, getPageSeo, getPublishedTours } from "@/lib/content";
 import { getSettings } from "@/lib/settings";
 import { breadcrumbSchema, buildMetadata, jsonLd } from "@/lib/seo";
 import { AVAILABILITY, PACKAGE_TYPES, labelFor } from "@/lib/list";
@@ -24,6 +25,8 @@ export async function generateMetadata(): Promise<Metadata> {
       seo?.description ||
       "Group, private and fully customised tour packages planned around your dates, your pace and your budget.",
     path: "/tours",
+    ogTitle: seo?.ogTitle,
+    ogDescription: seo?.ogDescription,
     imageUrl: seo?.ogImage?.url,
     canonicalUrl: seo?.canonicalUrl,
     noindex: seo?.noindex,
@@ -31,7 +34,11 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function ToursListingPage() {
-  const [tours, settings] = await Promise.all([getPublishedTours(), getSettings()]);
+  const [tours, settings, campaign] = await Promise.all([
+    getPublishedTours(),
+    getSettings(),
+    getActiveCampaign("tours"),
+  ]);
   const schema = jsonLd(breadcrumbSchema(settings.origin, CRUMBS));
 
   return (
@@ -44,12 +51,14 @@ export default async function ToursListingPage() {
         crumbs={CRUMBS}
       />
 
+      <PageCampaign campaign={campaign} />
+
       <section className="section">
         <div className="container-df">
           {tours.length > 0 ? (
             <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {tours.map((tour, index) => (
-                <Reveal as="li" key={tour.id} delay={(Math.min(index % 3, 3) as 0 | 1 | 2 | 3)}>
+                <Reveal as="li" key={tour.id} delay={Math.min(index % 3, 3) as 0 | 1 | 2 | 3}>
                   <Link href={`/tours/${tour.slug}`} className="group block">
                     <div className="relative aspect-[3/2] overflow-hidden rounded-md bg-navy-900">
                       <MediaImage
@@ -132,7 +141,9 @@ export default async function ToursListingPage() {
         </div>
       </section>
 
-      {schema ? <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: schema }} /> : null}
+      {schema ? (
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: schema }} />
+      ) : null}
     </>
   );
 }

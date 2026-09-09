@@ -34,13 +34,8 @@ const order = z.coerce.number().int().min(0).max(9999).optional().default(0);
 export const globalSettingsSchema = z.object({
   companyName: required("Company name", 120),
   tagline: text(160),
-  primaryPhone: text(32),
-  secondaryPhone: text(32),
-  whatsappNumber: text(32),
-  email: z
-    .union([z.literal(""), z.email("Enter a valid email address.")])
-    .optional()
-    .default(""),
+  // Phone numbers and email addresses are repeatable rows (ContactNumber /
+  // ContactEmail), not columns here — see contactNumberSchema below.
   addressLine1: text(200),
   addressLine2: text(200),
   city: text(120),
@@ -54,6 +49,8 @@ export const globalSettingsSchema = z.object({
   linkedinUrl: url("LinkedIn URL"),
   officeHours: text(200),
   footerText: longText(600),
+  googleSiteVerification: text(200),
+  bingSiteVerification: text(200),
   gaMeasurementId: text(40),
   gtmContainerId: text(40),
   metaPixelId: text(40),
@@ -115,14 +112,16 @@ export const homeWhySchema = z.object({
 export const visaSchema = z.object({
   countryName: required("Country name", 120),
   slug,
+  // Either empty, or exactly two letters. A single stray letter used to pass
+  // and then silently produced no flag.
   countryCode: z
     .string()
     .trim()
-    .max(2)
-    .regex(/^[A-Za-z]{0,2}$/, "Use a two-letter country code, e.g. JP.")
-    .optional()
-    .default("")
-    .transform((value) => value.toUpperCase()),
+    .toUpperCase()
+    .refine((value) => value === "" || /^[A-Z]{2}$/.test(value), {
+      message: "Use a two-letter country code, e.g. JP for Japan. Leave empty for no flag.",
+    })
+    .default(""),
   intro: longText(4000),
   categories: list,
   visaFormats: list,
@@ -142,6 +141,8 @@ export const visaSchema = z.object({
   isPlaceholder: bool,
   seoTitle: text(200),
   seoDescription: longText(400),
+  ogTitle: text(200),
+  ogDescription: longText(400),
   canonicalUrl: url("Canonical URL"),
   noindex: bool,
   coverImageId: optionalId,
@@ -172,6 +173,8 @@ export const tourSchema = z.object({
   isPlaceholder: bool,
   seoTitle: text(200),
   seoDescription: longText(400),
+  ogTitle: text(200),
+  ogDescription: longText(400),
   canonicalUrl: url("Canonical URL"),
   noindex: bool,
   coverImageId: optionalId,
@@ -191,6 +194,8 @@ export const campaignSchema = z.object({
   startsAt: text(40),
   endsAt: text(40),
   active: bool,
+  featured: bool,
+  displayLocation: z.enum(["homepage", "announcement_bar", "visa", "tours", "b2b"]),
   sortOrder: order,
   isPlaceholder: bool,
   desktopImageId: optionalId,
@@ -202,6 +207,8 @@ export const testimonialSchema = z.object({
   authorTitle: text(160),
   quote: required("Quote", 1200),
   serviceType: text(120),
+  destination: text(120),
+  reviewDate: text(40),
   rating: z
     .union([z.literal(""), z.coerce.number().int().min(1).max(5)])
     .optional()
@@ -227,6 +234,8 @@ export const pageSeoSchema = z.object({
   pageKey: required("Page", 60),
   title: text(200),
   description: longText(400),
+  ogTitle: text(200),
+  ogDescription: longText(400),
   canonicalUrl: url("Canonical URL"),
   noindex: bool,
   ogImageId: optionalId,
@@ -245,4 +254,48 @@ export const enquiryNoteSchema = z.object({
 export const mediaUpdateSchema = z.object({
   id: required("Media", 40),
   altText: text(300),
+  title: text(200),
+  caption: text(400),
+});
+
+/** A single contact number row (brief §4). */
+export const contactNumberSchema = z.object({
+  id: text(40),
+  label: z.enum(["Main Office", "WhatsApp", "Hotline", "B2B", "Support", "Other"]),
+  customLabel: text(60),
+  number: required("Phone number", 32).regex(/^[0-9+()\-\s]+$/, "Use digits and + ( ) - only."),
+  whatsappNumber: z
+    .string()
+    .trim()
+    .max(24)
+    .regex(/^[0-9]*$/, "Digits only, in full international form — e.g. 8801335374437.")
+    .optional()
+    .default(""),
+  whatsappEnabled: bool,
+  isPrimary: bool,
+  isPrimaryWhatsapp: bool,
+  showInHeader: bool,
+  showInFooter: bool,
+  showOnContact: bool,
+  showInMobileBar: bool,
+  sortOrder: order,
+});
+
+export const contactEmailSchema = z.object({
+  id: text(40),
+  label: text(60),
+  address: z.email("Enter a valid email address."),
+  isPrimary: bool,
+  showInFooter: bool,
+  showOnContact: bool,
+  sortOrder: order,
+});
+
+export const officeHourSchema = z.object({
+  id: text(40),
+  label: required("Days", 80),
+  value: required("Hours", 80),
+  note: text(160),
+  published: bool,
+  sortOrder: order,
 });

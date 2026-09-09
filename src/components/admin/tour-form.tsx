@@ -17,6 +17,9 @@ import { MediaPicker, type MediaOption } from "./media-picker";
 import { Panel } from "./ui";
 import { Repeatable, type RepeatableRow } from "./repeatable";
 import { IDLE_STATE } from "./action-state";
+import { UnsavedGuard } from "./unsaved-guard";
+import { RestoreValues } from "./restore-values";
+import { replayed } from "./use-form-values";
 import { AVAILABILITY, CONTENT_STATUS, PACKAGE_TYPES } from "@/lib/list";
 
 type TourFormData = {
@@ -41,6 +44,8 @@ type TourFormData = {
   isPlaceholder: boolean;
   seoTitle: string;
   seoDescription: string;
+  ogTitle: string;
+  ogDescription: string;
   canonicalUrl: string;
   noindex: boolean;
   coverImageId: string | null;
@@ -64,6 +69,9 @@ export function TourForm({
 }) {
   const [state, action] = useActionState(saveTourAction, IDLE_STATE);
   const error = (field: string) => state.fieldErrors?.[field];
+  // After a failed save, show what the editor typed rather than the stale
+  // saved value — otherwise one validation error wipes the whole form.
+  const kept = replayed(state);
 
   return (
     <>
@@ -79,20 +87,23 @@ export function TourForm({
 
       <form action={action} className="grid max-w-4xl gap-6">
         <input type="hidden" name="id" value={tour.id} />
+        <UnsavedGuard />
+        <RestoreValues state={state} />
+        <RestoreValues state={state} />
 
         <Panel title="Package">
           <FieldGrid>
             <Input
               label="Package name"
               name="name"
-              defaultValue={tour.name}
+              defaultValue={kept("name", tour.name)}
               required
               error={error("name")}
             />
             <Input
               label="URL slug"
               name="slug"
-              defaultValue={tour.slug}
+              defaultValue={kept("slug", tour.slug)}
               required
               hint="/tours/your-slug"
               error={error("slug")}
@@ -100,14 +111,14 @@ export function TourForm({
             <Input
               label="Destination"
               name="destination"
-              defaultValue={tour.destination}
+              defaultValue={kept("destination", tour.destination)}
               placeholder="e.g. Bangkok & Phuket"
               error={error("destination")}
             />
             <Input
               label="Country"
               name="country"
-              defaultValue={tour.country}
+              defaultValue={kept("country", tour.country)}
               placeholder="e.g. Thailand"
               error={error("country")}
             />
@@ -116,7 +127,7 @@ export function TourForm({
                 label="Short description"
                 name="shortDescription"
                 rows={3}
-                defaultValue={tour.shortDescription}
+                defaultValue={kept("shortDescription", tour.shortDescription)}
                 hint="One or two sentences. Shown on the card and under the page title."
                 error={error("shortDescription")}
               />
@@ -129,14 +140,14 @@ export function TourForm({
             <Input
               label="Duration"
               name="duration"
-              defaultValue={tour.duration}
+              defaultValue={kept("duration", tour.duration)}
               placeholder="e.g. 5 days / 4 nights"
               error={error("duration")}
             />
             <Input
               label="Travel dates"
               name="travelDates"
-              defaultValue={tour.travelDates}
+              defaultValue={kept("travelDates", tour.travelDates)}
               placeholder="e.g. 12–16 March 2026"
               error={error("travelDates")}
             />
@@ -144,20 +155,20 @@ export function TourForm({
               label="Package type"
               name="packageType"
               options={PACKAGE_TYPES}
-              defaultValue={tour.packageType}
+              defaultValue={kept("packageType", tour.packageType)}
               error={error("packageType")}
             />
             <Select
               label="Availability"
               name="availability"
               options={AVAILABILITY}
-              defaultValue={tour.availability}
+              defaultValue={kept("availability", tour.availability)}
               error={error("availability")}
             />
             <Input
               label="Starting price"
               name="startingPrice"
-              defaultValue={tour.startingPrice}
+              defaultValue={kept("startingPrice", tour.startingPrice)}
               placeholder="e.g. 65,000"
               hint="Numbers only — the currency is set separately."
               error={error("startingPrice")}
@@ -165,7 +176,7 @@ export function TourForm({
             <Input
               label="Currency"
               name="currency"
-              defaultValue={tour.currency}
+              defaultValue={kept("currency", tour.currency)}
               placeholder="BDT"
               error={error("currency")}
             />
@@ -178,7 +189,7 @@ export function TourForm({
               label="Highlights"
               name="highlights"
               rows={5}
-              defaultValue={tour.highlights}
+              defaultValue={kept("highlights", tour.highlights)}
               hint="One highlight per line."
               error={error("highlights")}
             />
@@ -186,7 +197,7 @@ export function TourForm({
               label="Hotel details"
               name="hotelDetails"
               rows={4}
-              defaultValue={tour.hotelDetails}
+              defaultValue={kept("hotelDetails", tour.hotelDetails)}
               error={error("hotelDetails")}
             />
             <FieldGrid>
@@ -194,7 +205,7 @@ export function TourForm({
                 label="Includes"
                 name="includes"
                 rows={6}
-                defaultValue={tour.includes}
+                defaultValue={kept("includes", tour.includes)}
                 hint="One item per line."
                 error={error("includes")}
               />
@@ -202,7 +213,7 @@ export function TourForm({
                 label="Excludes"
                 name="excludes"
                 rows={6}
-                defaultValue={tour.excludes}
+                defaultValue={kept("excludes", tour.excludes)}
                 hint="One item per line."
                 error={error("excludes")}
               />
@@ -211,7 +222,7 @@ export function TourForm({
               label="Important notes"
               name="importantNotes"
               rows={4}
-              defaultValue={tour.importantNotes}
+              defaultValue={kept("importantNotes", tour.importantNotes)}
               hint="One note per line. Shown in a highlighted box."
               error={error("importantNotes")}
             />
@@ -240,13 +251,32 @@ export function TourForm({
               label="Cover image"
               name="coverImageId"
               options={media}
-              defaultValue={tour.coverImageId}
+              defaultValue={kept("coverImageId", tour.coverImageId)}
             />
+            <FullWidth>
+              <Input
+                label="Social title"
+                name="ogTitle"
+                defaultValue={kept("ogTitle", tour.ogTitle)}
+                hint="Shown when the link is shared. Leave empty to reuse the SEO title."
+                error={error("ogTitle")}
+              />
+            </FullWidth>
+            <FullWidth>
+              <Textarea
+                label="Social description"
+                name="ogDescription"
+                rows={2}
+                defaultValue={kept("ogDescription", tour.ogDescription)}
+                hint="Leave empty to reuse the SEO description."
+                error={error("ogDescription")}
+              />
+            </FullWidth>
             <MediaPicker
               label="Social share image"
               name="ogImageId"
               options={media}
-              defaultValue={tour.ogImageId}
+              defaultValue={kept("ogImageId", tour.ogImageId)}
             />
           </FieldGrid>
         </Panel>
@@ -256,7 +286,7 @@ export function TourForm({
             label="Custom WhatsApp message"
             name="whatsappMessage"
             rows={2}
-            defaultValue={tour.whatsappMessage}
+            defaultValue={kept("whatsappMessage", tour.whatsappMessage)}
             hint={`Leave empty to use the default: "Hello DreamFly, I'm interested in ${tour.name}."`}
             error={error("whatsappMessage")}
           />
@@ -268,7 +298,7 @@ export function TourForm({
               <Input
                 label="SEO title"
                 name="seoTitle"
-                defaultValue={tour.seoTitle}
+                defaultValue={kept("seoTitle", tour.seoTitle)}
                 error={error("seoTitle")}
               />
             </FullWidth>
@@ -277,14 +307,14 @@ export function TourForm({
                 label="SEO description"
                 name="seoDescription"
                 rows={3}
-                defaultValue={tour.seoDescription}
+                defaultValue={kept("seoDescription", tour.seoDescription)}
                 error={error("seoDescription")}
               />
             </FullWidth>
             <Input
               label="Canonical URL"
               name="canonicalUrl"
-              defaultValue={tour.canonicalUrl}
+              defaultValue={kept("canonicalUrl", tour.canonicalUrl)}
               error={error("canonicalUrl")}
             />
             <Toggle
@@ -301,14 +331,14 @@ export function TourForm({
               label="Status"
               name="status"
               options={CONTENT_STATUS}
-              defaultValue={tour.status}
+              defaultValue={kept("status", tour.status)}
               error={error("status")}
             />
             <Input
               label="Featured order"
               name="featuredOrder"
               type="number"
-              defaultValue={tour.featuredOrder}
+              defaultValue={kept("featuredOrder", tour.featuredOrder)}
               hint="Lower numbers appear first."
               error={error("featuredOrder")}
             />

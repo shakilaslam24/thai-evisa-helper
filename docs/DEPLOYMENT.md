@@ -20,7 +20,7 @@
 | Variable | Required | Purpose |
 |---|---|---|
 | `DATABASE_URL` | yes | `file:./data/dreamfly.db`, or a PostgreSQL URL. A relative SQLite path resolves against the working directory. |
-| `NEXT_PUBLIC_SITE_URL` | yes | Public origin, no trailing slash. Canonical URLs, sitemap, Open Graph, admin origin check. |
+| `NEXT_PUBLIC_SITE_URL` | **yes** | Public origin, no trailing slash. Canonical URLs, sitemap, Open Graph, admin origin check. **Production refuses to start without it** — otherwise a missing value would silently publish `localhost` canonicals and sitemap URLs to Google. |
 | `SESSION_SECRET` | yes in production | Signs admin session cookies. The app refuses to start in production without it. |
 | `UPLOAD_DIR` | no | Default `./public/uploads`. Must be persistent. |
 | `MAX_UPLOAD_BYTES` | no | Default `8388608` (8 MB). |
@@ -184,6 +184,36 @@ and JSON columns for exactly this reason.
 
 ---
 
+## Search Console and sitemap
+
+Both `/robots.txt` and `/sitemap.xml` are generated on every request rather than
+cached. They are crawled rarely, so caching bought nothing — and it carried a
+real risk: a build run while "allow indexing" happened to be off would bake a
+site-wide `Disallow: /` into robots.txt and keep serving it.
+
+Google verification is a Global Settings field, not an environment variable, so
+marketing can complete it without a deploy. See
+[PRE-LAUNCH.md](PRE-LAUNCH.md#3-google-search-console).
+
+### Search Console API (not implemented)
+
+The brief raised an optional OAuth connection to the Search Console API, for
+submitting the sitemap from inside the admin panel. It is deliberately **not**
+built, for two reasons:
+
+1. It replaces a one-minute, once-ever task (pasting `sitemap.xml` into Search
+   Console) with a Google Cloud project, an OAuth client, a consent screen,
+   refresh-token storage and a token-expiry failure mode to maintain.
+2. It could not be verified end to end here — no Google credentials exist in
+   this environment — and shipping unverified OAuth code to production is a
+   poor trade.
+
+If it is wanted later it needs: a Google Cloud project, an OAuth 2.0 client ID
+and secret, `https://<your-domain>/api/google/callback` as the redirect URI, and
+the `https://www.googleapis.com/auth/webmasters` scope. The client secret would
+belong in an environment variable and the refresh token in the database. The
+verification-tag route already covers the common case.
+
 ## Health checks
 
 | Check | Expected |
@@ -193,6 +223,13 @@ and JSON columns for exactly this reason.
 | `GET /sitemap.xml` | 200, lists published visa and tour pages |
 | `GET /admin` signed out | 307 to `/admin/login` |
 | `GET /api/enquiries` | 404 (enquiry data is never publicly readable) |
+
+Or run the suites against the deployed site:
+
+```bash
+BASE_URL=https://www.dreamflyconsultancy.com npm run test:security
+BASE_URL=https://www.dreamflyconsultancy.com npm run test:audit
+```
 
 ---
 

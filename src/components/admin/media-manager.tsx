@@ -15,6 +15,8 @@ export type MediaItem = {
   url: string;
   originalName: string;
   altText: string;
+  title: string;
+  caption: string;
   mimeType: string;
   sizeLabel: string;
   dimensions: string;
@@ -55,6 +57,11 @@ function UploadForm({ maxBytes }: { maxBytes: number }) {
         <p className="field-hint">
           JPEG, PNG, WebP, AVIF or GIF. Up to {(maxBytes / 1024 / 1024).toFixed(0)} MB each.
         </p>
+        <div className="mt-3 rounded-sm border border-line bg-surface-alt px-3 py-2.5 text-[0.75rem] leading-relaxed text-ink-muted">
+          <strong className="block text-ink">Recommended sizes</strong>
+          Hero / campaign (desktop) 1600×700 · campaign (mobile) 1080×1350 · visa or tour cover
+          1600×1200 · social share 1200×630. Larger is fine — images are resized automatically.
+        </div>
       </div>
 
       <div>
@@ -164,14 +171,43 @@ function Details({ item, onClose }: { item: MediaItem; onClose: () => void }) {
                 <textarea
                   id={`alt-${item.id}`}
                   name="altText"
-                  rows={3}
+                  rows={2}
                   defaultValue={item.altText}
                   className="input"
                   maxLength={300}
                 />
+                <p className="field-hint">
+                  Describe the picture for screen readers and search engines.
+                </p>
+              </div>
+              <div>
+                <label htmlFor={`title-${item.id}`} className="field-label">
+                  Title <span className="optional">(optional)</span>
+                </label>
+                <input
+                  id={`title-${item.id}`}
+                  name="title"
+                  type="text"
+                  defaultValue={item.title}
+                  className="input"
+                  maxLength={200}
+                />
+              </div>
+              <div>
+                <label htmlFor={`caption-${item.id}`} className="field-label">
+                  Caption <span className="optional">(optional)</span>
+                </label>
+                <textarea
+                  id={`caption-${item.id}`}
+                  name="caption"
+                  rows={2}
+                  defaultValue={item.caption}
+                  className="input"
+                  maxLength={400}
+                />
               </div>
               <FormMessage status={updateState.status} message={updateState.message} />
-              <SubmitButton className="btn btn-primary btn-sm">Save alt text</SubmitButton>
+              <SubmitButton className="btn btn-primary btn-sm">Save details</SubmitButton>
             </form>
 
             <form action={deleteAction} className="mt-auto border-t border-line pt-4">

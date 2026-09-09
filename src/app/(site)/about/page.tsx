@@ -23,6 +23,8 @@ export async function generateMetadata(): Promise<Metadata> {
       seo?.description ||
       "DreamFly Consultancy is a travel and visa consultancy based in Gulshan, Dhaka.",
     path: "/about",
+    ogTitle: seo?.ogTitle,
+    ogDescription: seo?.ogDescription,
     imageUrl: seo?.ogImage?.url,
     canonicalUrl: seo?.canonicalUrl,
     noindex: seo?.noindex,
