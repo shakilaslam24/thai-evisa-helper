@@ -1,0 +1,478 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   DreamFly Consultancy — design system
+   --------------------------------------------------------------------------
+   Colours are taken from the official brand palette supplied with the logo:
+     Navy  #101F40   Gold  #C19864   Light Gold  #E5CA9B   White  #FFFFFF
+
+   Ratio discipline (brief §2): ~80% white/off-white, ~15% navy, ~5% gold.
+   Gold is reserved for eyebrows, hairlines, active states and small accents.
+   These tokens are design-owned: the CMS edits content, never these values.
+   ========================================================================== */
+
+@theme {
+  /* --- Brand ------------------------------------------------------------ */
+  --color-navy-50:  #f3f5f9;
+  --color-navy-100: #e3e8f1;
+  --color-navy-200: #c4cddf;
+  --color-navy-300: #9aa8c4;
+  --color-navy-400: #6a7da3;
+  --color-navy-500: #445884;
+  --color-navy-600: #2b3f66;
+  --color-navy-700: #1c2e50;
+  --color-navy-800: #162643;
+  --color-navy-900: #101f40;  /* official */
+  --color-navy-950: #0a1530;
+
+  --color-gold-50:  #fbf7f1;
+  --color-gold-100: #f5ecdd;
+  --color-gold-200: #e5ca9b;  /* official light gold */
+  --color-gold-300: #d7b581;
+  --color-gold-400: #c19864;  /* official gold */
+  --color-gold-500: #ab8352;
+  --color-gold-600: #8d6a40;
+
+  /* --- Surfaces --------------------------------------------------------- */
+  --color-canvas:      #fbfaf8;
+  --color-surface:     #ffffff;
+  --color-surface-alt: #f6f4f0;
+  --color-line:        rgb(16 31 64 / 0.10);
+  --color-line-strong: rgb(16 31 64 / 0.18);
+  --color-line-gold:   rgb(193 152 100 / 0.34);
+
+  /* --- Text ------------------------------------------------------------- */
+  --color-ink:        #101f40;
+  --color-ink-muted:  #4d5a75;
+  --color-ink-subtle: #6f7b93;
+  --color-on-navy:        #ffffff;
+  --color-on-navy-muted:  rgb(255 255 255 / 0.74);
+  --color-on-navy-subtle: rgb(255 255 255 / 0.54);
+
+  /* --- Typography ------------------------------------------------------- */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: var(--font-jakarta), var(--font-inter), ui-sans-serif,
+    system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  /* Fluid display scale — the typography does the heavy lifting, not effects */
+  --text-display: clamp(2.4rem, 1.25rem + 4.6vw, 4.4rem);
+  --text-display--line-height: 1.04;
+  --text-display--letter-spacing: -0.035em;
+
+  --text-h1: clamp(2rem, 1.2rem + 3.2vw, 3.3rem);
+  --text-h1--line-height: 1.08;
+  --text-h1--letter-spacing: -0.03em;
+
+  --text-h2: clamp(1.65rem, 1.15rem + 2vw, 2.6rem);
+  --text-h2--line-height: 1.14;
+  --text-h2--letter-spacing: -0.025em;
+
+  --text-h3: clamp(1.2rem, 1rem + 0.75vw, 1.5rem);
+  --text-h3--line-height: 1.26;
+  --text-h3--letter-spacing: -0.015em;
+
+  --text-lead: clamp(1.02rem, 0.96rem + 0.3vw, 1.175rem);
+  --text-lead--line-height: 1.62;
+
+  --text-eyebrow: 0.6875rem;
+  --text-eyebrow--line-height: 1;
+  --text-eyebrow--letter-spacing: 0.2em;
+
+  /* --- Shape ------------------------------------------------------------ */
+  --radius-xs: 3px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+
+  /* --- Elevation — restrained, never a glow ----------------------------- */
+  --shadow-xs: 0 1px 2px rgb(16 31 64 / 0.05);
+  --shadow-sm: 0 2px 8px -2px rgb(16 31 64 / 0.07);
+  --shadow-md: 0 12px 28px -12px rgb(16 31 64 / 0.16);
+  --shadow-lg: 0 28px 60px -28px rgb(16 31 64 / 0.26);
+
+  --ease-out-soft: cubic-bezier(0.22, 0.68, 0.36, 1);
+}
+
+/* Vertical rhythm. Kept outside @theme so it cannot collide with Tailwind's
+   --spacing-* scale namespace; referenced directly by the layout classes. */
+:root {
+  --section-space:    clamp(4.5rem, 3rem + 6vw, 8.5rem);
+  --section-space-sm: clamp(3rem, 2rem + 4vw, 5.5rem);
+  --gutter:           clamp(1.25rem, 0.75rem + 2vw, 2.5rem);
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+
+@layer base {
+  * { border-color: var(--color-line); }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+    /* Keep anchored sections clear of the sticky header */
+    scroll-padding-top: 6rem;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink-muted);
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    /* Nothing on this site may scroll the page sideways */
+    overflow-x: clip;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    color: var(--color-ink);
+    font-weight: 600;
+    text-wrap: balance;
+  }
+
+  p { text-wrap: pretty; }
+
+  :focus-visible {
+    outline: 2px solid var(--color-gold-400);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  /* Remove the outline only where a custom focus ring is drawn instead */
+  [data-focus-ring="custom"]:focus-visible { outline: none; }
+
+  ::selection {
+    background-color: var(--color-navy-900);
+    color: #fff;
+  }
+
+  img, svg, video { display: block; max-width: 100%; height: auto; }
+
+  input, textarea, select, button { font: inherit; color: inherit; }
+
+  /* iOS zooms any field under 16px on focus */
+  @media (max-width: 767px) {
+    input, textarea, select { font-size: 16px; }
+  }
+}
+
+/* ==========================================================================
+   Components
+   ========================================================================== */
+
+@layer components {
+
+  /* --- Layout ----------------------------------------------------------- */
+  .container-df {
+    width: 100%;
+    max-width: 78rem; /* 1248px */
+    margin-inline: auto;
+    padding-inline: var(--gutter);
+  }
+  .container-narrow {
+    width: 100%;
+    max-width: 46rem;
+    margin-inline: auto;
+    padding-inline: var(--gutter);
+  }
+  /* Left half of a split hero: aligns with .container-df but lets the right
+     half bleed to the viewport edge. */
+  .container-left-pad {
+    padding-inline-start: max(var(--gutter), calc((100vw - 78rem) / 2));
+    padding-inline-end: var(--gutter);
+  }
+
+  .section    { padding-block: var(--section-space); }
+  .section-sm { padding-block: var(--section-space-sm); }
+
+  /* --- Typography ------------------------------------------------------- */
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-family: var(--font-sans);
+    font-size: var(--text-eyebrow);
+    font-weight: 600;
+    letter-spacing: var(--text-eyebrow--letter-spacing);
+    text-transform: uppercase;
+    color: var(--color-gold-500);
+  }
+  .eyebrow::before {
+    content: "";
+    width: 1.75rem;
+    height: 1px;
+    background-color: currentColor;
+    opacity: 0.65;
+  }
+  .eyebrow-center { justify-content: center; }
+  .eyebrow-center::after {
+    content: "";
+    width: 1.75rem;
+    height: 1px;
+    background-color: currentColor;
+    opacity: 0.65;
+  }
+  .on-navy .eyebrow { color: var(--color-gold-200); }
+
+  .lead {
+    font-size: var(--text-lead);
+    line-height: var(--text-lead--line-height);
+    color: var(--color-ink-muted);
+  }
+  .on-navy .lead { color: var(--color-on-navy-muted); }
+  .on-navy h1, .on-navy h2, .on-navy h3, .on-navy h4 { color: var(--color-on-navy); }
+
+  .accent { color: var(--color-gold-400); }
+
+  /* Rich text rendered from CMS fields */
+  .prose-df > * + * { margin-top: 1rem; }
+  .prose-df p { color: var(--color-ink-muted); }
+  .prose-df strong { color: var(--color-ink); font-weight: 600; }
+
+  /* --- Buttons ---------------------------------------------------------- */
+  .btn {
+    --btn-bg: transparent;
+    --btn-fg: var(--color-ink);
+    --btn-border: transparent;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.55rem;
+    min-height: 2.875rem;
+    padding: 0.6875rem 1.375rem;
+    border: 1px solid var(--btn-border);
+    border-radius: var(--radius-sm);
+    background-color: var(--btn-bg);
+    color: var(--btn-fg);
+    font-family: var(--font-sans);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    line-height: 1.2;
+    text-align: center;
+    cursor: pointer;
+    transition:
+      background-color 180ms var(--ease-out-soft),
+      border-color 180ms var(--ease-out-soft),
+      color 180ms var(--ease-out-soft),
+      transform 180ms var(--ease-out-soft);
+  }
+  .btn:disabled, .btn[aria-disabled="true"] { opacity: 0.55; cursor: not-allowed; }
+  .btn:not(:disabled):active { transform: translateY(1px); }
+
+  .btn-primary { --btn-bg: var(--color-navy-900); --btn-fg: #fff; --btn-border: var(--color-navy-900); }
+  .btn-primary:not(:disabled):hover { --btn-bg: var(--color-navy-700); --btn-border: var(--color-navy-700); }
+
+  .btn-gold { --btn-bg: var(--color-gold-400); --btn-fg: var(--color-navy-950); --btn-border: var(--color-gold-400); }
+  .btn-gold:not(:disabled):hover { --btn-bg: var(--color-gold-300); --btn-border: var(--color-gold-300); }
+
+  .btn-outline { --btn-fg: var(--color-ink); --btn-border: var(--color-line-strong); }
+  .btn-outline:not(:disabled):hover { --btn-bg: var(--color-navy-50); --btn-border: var(--color-navy-300); }
+
+  /* Outline on a navy field */
+  .btn-outline-invert { --btn-fg: #fff; --btn-border: rgb(255 255 255 / 0.38); }
+  .btn-outline-invert:not(:disabled):hover {
+    --btn-bg: rgb(255 255 255 / 0.10);
+    --btn-border: rgb(255 255 255 / 0.62);
+  }
+
+  .btn-ghost { --btn-fg: var(--color-ink); }
+  .btn-ghost:not(:disabled):hover { --btn-bg: var(--color-navy-50); }
+
+  .btn-lg { min-height: 3.25rem; padding-inline: 1.75rem; font-size: 1rem; }
+  .btn-sm { min-height: 2.375rem; padding: 0.4375rem 0.875rem; font-size: 0.875rem; }
+  .btn-block { width: 100%; }
+
+  /* Text link with a gold underline that grows on hover */
+  .link-arrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 600;
+    font-size: 0.9375rem;
+    color: var(--color-ink);
+    transition: gap 180ms var(--ease-out-soft), color 180ms var(--ease-out-soft);
+  }
+  .link-arrow svg { transition: transform 220ms var(--ease-out-soft); }
+  .link-arrow:hover { color: var(--color-gold-500); }
+  .link-arrow:hover svg { transform: translateX(3px); }
+  .on-navy .link-arrow { color: #fff; }
+  .on-navy .link-arrow:hover { color: var(--color-gold-200); }
+
+  /* --- Surfaces --------------------------------------------------------- */
+  .card {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-md);
+  }
+  .card-interactive {
+    transition:
+      border-color 220ms var(--ease-out-soft),
+      box-shadow 220ms var(--ease-out-soft),
+      transform 220ms var(--ease-out-soft);
+  }
+  @media (hover: hover) {
+    .card-interactive:hover {
+      border-color: var(--color-line-gold);
+      box-shadow: var(--shadow-md);
+      transform: translateY(-3px);
+    }
+  }
+
+  .panel-navy {
+    background-color: var(--color-navy-900);
+    color: var(--color-on-navy-muted);
+  }
+  /* A deeper plane, used where two navy fields meet (CTA band -> footer) so
+     they read as separate surfaces without needing a hard dividing rule. */
+  .panel-navy-deep {
+    background-color: var(--color-navy-950);
+    color: var(--color-on-navy-muted);
+  }
+
+  .hairline { height: 1px; background-color: var(--color-line); border: 0; }
+  .hairline-gold { height: 1px; width: 3rem; background-color: var(--color-gold-400); border: 0; }
+
+  /* --- Forms ------------------------------------------------------------ */
+  .field-label {
+    display: block;
+    margin-bottom: 0.4375rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: var(--color-ink);
+  }
+  .field-label .optional { font-weight: 400; color: var(--color-ink-subtle); }
+
+  .input {
+    display: block;
+    width: 100%;
+    min-height: 2.875rem;
+    padding: 0.625rem 0.875rem;
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-line-strong);
+    border-radius: var(--radius-sm);
+    color: var(--color-ink);
+    font-size: 0.9375rem;
+    transition: border-color 160ms var(--ease-out-soft), box-shadow 160ms var(--ease-out-soft);
+  }
+  .input::placeholder { color: var(--color-ink-subtle); opacity: 0.75; }
+  .input:focus {
+    outline: none;
+    border-color: var(--color-gold-400);
+    box-shadow: 0 0 0 3px rgb(193 152 100 / 0.18);
+  }
+  .input[aria-invalid="true"] {
+    border-color: #b3261e;
+    box-shadow: 0 0 0 3px rgb(179 38 30 / 0.12);
+  }
+  textarea.input { min-height: 7rem; resize: vertical; line-height: 1.6; }
+  select.input {
+    appearance: none;
+    padding-right: 2.25rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%234d5a75' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.8125rem center;
+  }
+
+  .field-error { margin-top: 0.375rem; font-size: 0.8125rem; color: #b3261e; }
+  .field-hint  { margin-top: 0.375rem; font-size: 0.8125rem; color: var(--color-ink-subtle); }
+
+  /* Honeypot: hidden from people, reachable by bots */
+  .honeypot {
+    position: absolute;
+    left: -9999px;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+  }
+
+  /* --- Badges ----------------------------------------------------------- */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.625rem;
+    border: 1px solid var(--color-line);
+    border-radius: 999px;
+    background-color: var(--color-surface-alt);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    color: var(--color-ink-muted);
+    white-space: nowrap;
+  }
+  .badge-gold {
+    border-color: var(--color-line-gold);
+    background-color: var(--color-gold-50);
+    color: var(--color-gold-600);
+  }
+  .badge-navy { border-color: transparent; background-color: var(--color-navy-900); color: #fff; }
+
+  /* --- Utility ---------------------------------------------------------- */
+  .skip-link {
+    position: absolute;
+    left: 1rem;
+    top: -100%;
+    z-index: 100;
+    padding: 0.75rem 1.25rem;
+    background: var(--color-navy-900);
+    color: #fff;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+  }
+  .skip-link:focus { top: 1rem; }
+
+  /* Keeps the mobile action bar clear of page content */
+  .mobile-bar-offset { padding-bottom: calc(4.25rem + env(safe-area-inset-bottom)); }
+  @media (min-width: 768px) { .mobile-bar-offset { padding-bottom: 0; } }
+}
+
+/* ==========================================================================
+   Motion — small, purposeful, and always opt-out-able
+   ========================================================================== */
+
+@layer utilities {
+  .reveal {
+    opacity: 0;
+    transform: translateY(14px);
+    transition:
+      opacity 640ms var(--ease-out-soft),
+      transform 640ms var(--ease-out-soft);
+  }
+  .reveal[data-visible="true"] { opacity: 1; transform: none; }
+
+  .reveal-delay-1 { transition-delay: 70ms; }
+  .reveal-delay-2 { transition-delay: 140ms; }
+  .reveal-delay-3 { transition-delay: 210ms; }
+
+  /* Ken-Burns-free image hover: a 2% scale, nothing more */
+  .img-zoom { transition: transform 700ms var(--ease-out-soft); }
+  @media (hover: hover) {
+    .group:hover .img-zoom { transform: scale(1.03); }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .reveal { opacity: 1 !important; transform: none !important; }
+}
+
+@media print {
+  .no-print { display: none !important; }
+}

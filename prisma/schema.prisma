@@ -1,0 +1,619 @@
+// DreamFly Consultancy — website database.
+//
+// This database belongs to the WEBSITE ONLY. It is deliberately separate from
+// the DreamFly CRM: no shared tables, no shared auth, no foreign keys across
+// systems. See docs/ARCHITECTURE.md.
+//
+// Portability note: the schema avoids native enums, arrays and JSON column
+// types so the same models run on SQLite (default) and PostgreSQL. Switching
+// is a `provider` change plus a fresh migration — no model rewrites.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ---------------------------------------------------------------------------
+// Access control
+// ---------------------------------------------------------------------------
+
+model AdminUser {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String
+  passwordHash String // scrypt: N$r$p$salt$hash — see src/lib/auth/password.ts
+  role         String    @default("editor") // "owner" | "admin" | "editor"
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  sessions  AdminSession[]
+  auditLogs AuditLog[]
+  media     Media[]
+
+  @@index([email])
+}
+
+model AdminSession {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique // sha256 of the cookie value; the raw token is never stored
+  userId    String
+  expiresAt DateTime
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user AdminUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  userEmail  String? // denormalised so history survives user deletion
+  action     String // "login" | "create" | "update" | "delete" | "publish" | ...
+  entityType String
+  entityId   String?
+  summary    String
+  metadata   String? // JSON string
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  user AdminUser? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([entityType, entityId])
+}
+
+// ---------------------------------------------------------------------------
+// Global settings — single row (id = "global"). Every piece of business
+// information on the public site reads from here; nothing is hard-coded.
+// ---------------------------------------------------------------------------
+
+model GlobalSettings {
+  id String @id @default("global")
+
+  companyName String @default("DreamFly Consultancy")
+  tagline     String @default("Fly Beyond Your Dreams")
+  logoLightId String? // logo used on light backgrounds (navy ink)
+  logoDarkId  String? // logo used on dark backgrounds (white ink)
+  faviconId   String?
+
+  primaryPhone   String @default("")
+  secondaryPhone String @default("")
+  whatsappNumber String @default("") // digits only, international format
+  email          String @default("")
+
+  addressLine1 String @default("")
+  addressLine2 String @default("")
+  city         String @default("")
+  country      String @default("")
+
+  googleMapsUrl   String @default("")
+  googleMapsEmbed String @default("") // embed URL only; rendered in a sandboxed iframe
+
+  facebookUrl  String @default("")
+  instagramUrl String @default("")
+  tiktokUrl    String @default("")
+  youtubeUrl   String @default("")
+  linkedinUrl  String @default("")
+
+  officeHours String @default("")
+  footerText  String @default("")
+
+  gaMeasurementId String @default("")
+  gtmContainerId  String @default("")
+  metaPixelId     String @default("")
+
+  defaultSeoTitle       String  @default("")
+  defaultSeoDescription String  @default("")
+  defaultSocialImageId  String?
+  siteUrl               String  @default("https://www.dreamflyconsultancy.com")
+  allowIndexing         Boolean @default(true)
+
+  updatedAt DateTime @updatedAt
+
+  logoLight        Media? @relation("SettingsLogoLight", fields: [logoLightId], references: [id], onDelete: SetNull)
+  logoDark         Media? @relation("SettingsLogoDark", fields: [logoDarkId], references: [id], onDelete: SetNull)
+  favicon          Media? @relation("SettingsFavicon", fields: [faviconId], references: [id], onDelete: SetNull)
+  defaultSocialImg Media? @relation("SettingsSocial", fields: [defaultSocialImageId], references: [id], onDelete: SetNull)
+}
+
+// ---------------------------------------------------------------------------
+// Media library
+// ---------------------------------------------------------------------------
+
+model Media {
+  id          String   @id @default(cuid())
+  filename    String // stored filename (content-addressed, random)
+  originalName String
+  url         String // public path, e.g. /uploads/ab12….webp
+  mimeType    String
+  sizeBytes   Int
+  width       Int?
+  height      Int?
+  altText     String   @default("")
+  uploadedById String?
+  createdAt   DateTime @default(now())
+
+  uploadedBy AdminUser? @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  settingsLogoLight GlobalSettings[] @relation("SettingsLogoLight")
+  settingsLogoDark  GlobalSettings[] @relation("SettingsLogoDark")
+  settingsFavicon   GlobalSettings[] @relation("SettingsFavicon")
+  settingsSocial    GlobalSettings[] @relation("SettingsSocial")
+
+  heroDesktop  HomeHero[] @relation("HeroDesktop")
+  heroMobile   HomeHero[] @relation("HeroMobile")
+  visaFlag     VisaDestination[] @relation("VisaFlag")
+  visaCover    VisaDestination[] @relation("VisaCover")
+  visaOg       VisaDestination[] @relation("VisaOg")
+  visaGallery  VisaGalleryImage[]
+  tourCover    TourPackage[] @relation("TourCover")
+  tourOg       TourPackage[] @relation("TourOg")
+  tourGallery  TourGalleryImage[]
+  campaignDesktop Campaign[] @relation("CampaignDesktop")
+  campaignMobile  Campaign[] @relation("CampaignMobile")
+  testimonialAvatar Testimonial[]
+  aboutGallery AboutGalleryImage[]
+  teamPhoto    TeamMember[]
+  serviceImage HomeService[]
+  pageOg       PageSeo[]
+
+  @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Homepage — controlled flexibility.
+//
+// Sections are a fixed, design-owned set. An administrator may toggle and
+// reorder them and edit their copy, but cannot invent new section types or
+// break the layout. This is deliberate (brief §16).
+// ---------------------------------------------------------------------------
+
+model HomeSection {
+  id       String  @id @default(cuid())
+  key      String  @unique // "hero" | "services" | "visas" | "campaign" | "why" | "tours" | "testimonials" | "cta"
+  label    String
+  enabled  Boolean @default(true)
+  sortOrder Int    @default(0)
+  heading   String @default("")
+  subheading String @default("")
+  ctaLabel  String @default("")
+  ctaHref   String @default("")
+
+  @@index([sortOrder])
+}
+
+model HomeHero {
+  id String @id @default("hero")
+
+  eyebrow          String @default("")
+  headline         String @default("")
+  headlineAccent   String @default("") // rendered in gold, appended to the headline
+  description      String @default("")
+  brandLine        String @default("")
+  badge            String @default("")
+  desktopImageId   String?
+  mobileImageId    String?
+  videoUrl         String @default("")
+  primaryCtaLabel  String @default("")
+  primaryCtaHref   String @default("")
+  secondaryCtaLabel String @default("")
+  secondaryCtaHref String @default("")
+  updatedAt        DateTime @updatedAt
+
+  desktopImage Media? @relation("HeroDesktop", fields: [desktopImageId], references: [id], onDelete: SetNull)
+  mobileImage  Media? @relation("HeroMobile", fields: [mobileImageId], references: [id], onDelete: SetNull)
+}
+
+model HomeService {
+  id          String  @id @default(cuid())
+  title       String
+  description String  @default("")
+  icon        String  @default("visa") // key into the design-owned icon set
+  href        String  @default("")
+  imageId     String?
+  enabled     Boolean @default(true)
+  sortOrder   Int     @default(0)
+
+  image Media? @relation(fields: [imageId], references: [id], onDelete: SetNull)
+
+  @@index([sortOrder])
+}
+
+model HomeWhyItem {
+  id          String  @id @default(cuid())
+  title       String
+  description String  @default("")
+  icon        String  @default("shield")
+  enabled     Boolean @default(true)
+  sortOrder   Int     @default(0)
+
+  @@index([sortOrder])
+}
+
+// ---------------------------------------------------------------------------
+// Visa destinations — fully data driven. One template, many countries.
+// ---------------------------------------------------------------------------
+
+model VisaDestination {
+  id          String @id @default(cuid())
+  countryName String
+  slug        String @unique
+  countryCode String @default("") // ISO 3166-1 alpha-2, used for the flag glyph
+  flagImageId String?
+  coverImageId String?
+  intro       String @default("")
+
+  // Categories / format / entry are stored as comma-separated keys so the same
+  // schema runs on SQLite and PostgreSQL. Helpers in src/lib/list.ts parse them.
+  categories  String @default("") // "tourist,business,visit,other"
+  visaFormats String @default("") // "sticker,evisa,other"
+  entryTypes  String @default("") // "single,multiple,both"
+
+  processingTime String @default("")
+
+  serviceCharge String @default("") // free text: fee structures vary by country
+  embassyFee    String @default("")
+  otherCharges  String @default("")
+  feeNote       String @default("")
+
+  eligibility     String @default("")
+  applicationProcess String @default("")
+  importantNotes  String @default("")
+
+  whatsappMessage String @default("")
+
+  featured      Boolean @default(false)
+  featuredOrder Int     @default(0)
+  status        String  @default("draft") // "draft" | "published" | "archived"
+  isPlaceholder Boolean @default(false) // seeded sample content, never shown publicly
+
+  seoTitle       String  @default("")
+  seoDescription String  @default("")
+  ogImageId      String?
+  canonicalUrl   String  @default("")
+  noindex        Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  flagImage  Media? @relation("VisaFlag", fields: [flagImageId], references: [id], onDelete: SetNull)
+  coverImage Media? @relation("VisaCover", fields: [coverImageId], references: [id], onDelete: SetNull)
+  ogImage    Media? @relation("VisaOg", fields: [ogImageId], references: [id], onDelete: SetNull)
+
+  documents VisaDocument[]
+  faqs      VisaFaq[]
+  gallery   VisaGalleryImage[]
+
+  @@index([status, featured, featuredOrder])
+  @@index([slug])
+}
+
+model VisaDocument {
+  id          String  @id @default(cuid())
+  destinationId String
+  label       String
+  note        String  @default("")
+  category    String  @default("") // optional grouping, e.g. "Tourist"
+  sortOrder   Int     @default(0)
+
+  destination VisaDestination @relation(fields: [destinationId], references: [id], onDelete: Cascade)
+
+  @@index([destinationId, sortOrder])
+}
+
+model VisaFaq {
+  id            String @id @default(cuid())
+  destinationId String
+  question      String
+  answer        String
+  sortOrder     Int    @default(0)
+
+  destination VisaDestination @relation(fields: [destinationId], references: [id], onDelete: Cascade)
+
+  @@index([destinationId, sortOrder])
+}
+
+model VisaGalleryImage {
+  id            String @id @default(cuid())
+  destinationId String
+  mediaId       String
+  sortOrder     Int    @default(0)
+
+  destination VisaDestination @relation(fields: [destinationId], references: [id], onDelete: Cascade)
+  media       Media           @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@index([destinationId, sortOrder])
+}
+
+// ---------------------------------------------------------------------------
+// Tour packages
+// ---------------------------------------------------------------------------
+
+model TourPackage {
+  id          String @id @default(cuid())
+  name        String
+  slug        String @unique
+  destination String @default("")
+  country     String @default("")
+  coverImageId String?
+  shortDescription String @default("")
+
+  duration     String @default("")
+  travelDates  String @default("")
+  packageType  String @default("group") // "group" | "private" | "custom"
+  startingPrice String @default("")
+  currency     String @default("BDT")
+
+  hotelDetails    String @default("")
+  importantNotes  String @default("")
+  availability    String @default("available") // "available" | "upcoming" | "sold_out"
+
+  whatsappMessage String @default("")
+
+  featured      Boolean @default(false)
+  featuredOrder Int     @default(0)
+  status        String  @default("draft")
+  isPlaceholder Boolean @default(false)
+
+  seoTitle       String  @default("")
+  seoDescription String  @default("")
+  ogImageId      String?
+  canonicalUrl   String  @default("")
+  noindex        Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  coverImage Media? @relation("TourCover", fields: [coverImageId], references: [id], onDelete: SetNull)
+  ogImage    Media? @relation("TourOg", fields: [ogImageId], references: [id], onDelete: SetNull)
+
+  highlights TourHighlight[]
+  itinerary  TourItineraryDay[]
+  listItems  TourListItem[]
+  gallery    TourGalleryImage[]
+
+  @@index([status, featured, featuredOrder])
+  @@index([slug])
+}
+
+model TourHighlight {
+  id        String @id @default(cuid())
+  packageId String
+  label     String
+  sortOrder Int    @default(0)
+
+  package TourPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@index([packageId, sortOrder])
+}
+
+model TourItineraryDay {
+  id        String @id @default(cuid())
+  packageId String
+  dayLabel  String // "Day 1", "Days 3–4", …
+  title     String
+  body      String @default("")
+  sortOrder Int    @default(0)
+
+  package TourPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@index([packageId, sortOrder])
+}
+
+model TourListItem {
+  id        String @id @default(cuid())
+  packageId String
+  kind      String // "include" | "exclude"
+  label     String
+  sortOrder Int    @default(0)
+
+  package TourPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@index([packageId, kind, sortOrder])
+}
+
+model TourGalleryImage {
+  id        String @id @default(cuid())
+  packageId String
+  mediaId   String
+  sortOrder Int    @default(0)
+
+  package TourPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  media   Media       @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@index([packageId, sortOrder])
+}
+
+// ---------------------------------------------------------------------------
+// Campaigns — scheduled promotional band on the homepage
+// ---------------------------------------------------------------------------
+
+model Campaign {
+  id          String @id @default(cuid())
+  name        String
+  headline    String @default("")
+  description String @default("")
+  desktopImageId String?
+  mobileImageId  String?
+  ctaLabel    String @default("")
+  ctaHref     String @default("")
+  startsAt    DateTime?
+  endsAt      DateTime?
+  active      Boolean @default(false)
+  sortOrder   Int     @default(0)
+  isPlaceholder Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  desktopImage Media? @relation("CampaignDesktop", fields: [desktopImageId], references: [id], onDelete: SetNull)
+  mobileImage  Media? @relation("CampaignMobile", fields: [mobileImageId], references: [id], onDelete: SetNull)
+
+  @@index([active, sortOrder])
+}
+
+// ---------------------------------------------------------------------------
+// Testimonials — only real, admin-entered, explicitly published entries are
+// ever rendered. The section hides itself when there are none.
+// ---------------------------------------------------------------------------
+
+model Testimonial {
+  id          String  @id @default(cuid())
+  authorName  String
+  authorTitle String  @default("")
+  quote       String
+  serviceType String  @default("")
+  rating      Int? // 1–5, optional
+  avatarId    String?
+  published   Boolean @default(false)
+  sortOrder   Int     @default(0)
+  isPlaceholder Boolean @default(false)
+  createdAt   DateTime @default(now())
+
+  avatar Media? @relation(fields: [avatarId], references: [id], onDelete: SetNull)
+
+  @@index([published, sortOrder])
+}
+
+// ---------------------------------------------------------------------------
+// About page
+// ---------------------------------------------------------------------------
+
+model AboutPage {
+  id String @id @default("about")
+
+  heroHeading    String @default("")
+  heroSubheading String @default("")
+  whoWeAre       String @default("")
+  mission        String @default("")
+  vision         String @default("")
+  approach       String @default("")
+  galleryHeading String @default("")
+  teamHeading    String @default("")
+  updatedAt      DateTime @updatedAt
+}
+
+model AboutGalleryImage {
+  id        String @id @default(cuid())
+  mediaId   String
+  caption   String @default("")
+  sortOrder Int    @default(0)
+
+  media Media @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@index([sortOrder])
+}
+
+model TeamMember {
+  id        String  @id @default(cuid())
+  name      String
+  role      String  @default("")
+  bio       String  @default("")
+  photoId   String?
+  published Boolean @default(false)
+  sortOrder Int     @default(0)
+  isPlaceholder Boolean @default(false)
+
+  photo Media? @relation(fields: [photoId], references: [id], onDelete: SetNull)
+
+  @@index([published, sortOrder])
+}
+
+model Milestone {
+  id        String  @id @default(cuid())
+  label     String
+  value     String
+  published Boolean @default(false)
+  sortOrder Int     @default(0)
+
+  @@index([published, sortOrder])
+}
+
+// ---------------------------------------------------------------------------
+// Per-page SEO overrides for the fixed marketing pages
+// ---------------------------------------------------------------------------
+
+model PageSeo {
+  id          String  @id @default(cuid())
+  pageKey     String  @unique // "home" | "visa" | "tours" | "air-ticket-hotel" | "b2b" | "about" | "contact"
+  title       String  @default("")
+  description String  @default("")
+  ogImageId   String?
+  canonicalUrl String @default("")
+  noindex     Boolean @default(false)
+  updatedAt   DateTime @updatedAt
+
+  ogImage Media? @relation(fields: [ogImageId], references: [id], onDelete: SetNull)
+}
+
+// ---------------------------------------------------------------------------
+// Enquiries — one unified table for every public form.
+//
+// Common columns cover what every enquiry has; `payloadJson` carries the
+// type-specific fields (flight route, hotel dates, B2B company profile). The
+// `external*` columns are reserved for a FUTURE CRM push and are unused today
+// — see src/lib/enquiries/dispatch.ts.
+// ---------------------------------------------------------------------------
+
+model Enquiry {
+  id   String @id @default(cuid())
+  type String // "visa" | "tour" | "air_ticket" | "hotel" | "b2b" | "general"
+
+  name     String
+  phone    String
+  whatsapp String @default("")
+  email    String @default("")
+
+  service     String @default("")
+  destination String @default("")
+  message     String @default("")
+
+  payloadJson String @default("{}")
+
+  sourcePage  String @default("")
+  referrer    String @default("")
+  utmSource   String @default("")
+  utmMedium   String @default("")
+  utmCampaign String @default("")
+  utmContent  String @default("")
+  utmTerm     String @default("")
+
+  status   String @default("new") // new | contacted | follow_up | converted | closed | archived
+  archived Boolean @default(false)
+
+  // Reserved for a future, opt-in CRM handoff. Nothing writes these today.
+  externalId    String?
+  externalState String @default("not_dispatched")
+  externalSyncedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  notes EnquiryNote[]
+
+  @@index([type, status])
+  @@index([createdAt])
+  @@index([archived])
+}
+
+model EnquiryNote {
+  id        String   @id @default(cuid())
+  enquiryId String
+  body      String
+  authorName String  @default("")
+  createdAt DateTime @default(now())
+
+  enquiry Enquiry @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
+
+  @@index([enquiryId, createdAt])
+}
