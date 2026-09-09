@@ -4,6 +4,7 @@
   "private": true,
   "description": "Official website for DreamFly Consultancy — Fly Beyond Your Dreams.",
   "scripts": {
+    "postinstall": "prisma generate",
     "dev": "next dev",
     "build": "prisma generate && prisma migrate deploy && next build",
     "start": "next start",

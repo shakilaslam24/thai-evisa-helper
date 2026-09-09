@@ -43,7 +43,7 @@ deploy.
 ```bash
 git clone <repository> dreamfly-website
 cd dreamfly-website
-npm ci
+npm ci                        # also generates the Prisma client
 
 cp .env.example .env
 # edit .env: DATABASE_URL, NEXT_PUBLIC_SITE_URL, SESSION_SECRET
@@ -197,6 +197,10 @@ and JSON columns for exactly this reason.
 ---
 
 ## Troubleshooting
+
+**"Cannot find module '../src/generated/prisma/client'".** The Prisma client is
+generated code and is deliberately not committed. Run `npm install` (which
+generates it via `postinstall`), or `npx prisma generate` on its own.
 
 **Images 404 after a deploy.** `public/uploads` is gitignored by design. Restore
 it from a backup, or point `UPLOAD_DIR` at the persistent volume where it lives.

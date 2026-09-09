@@ -15,13 +15,16 @@ details and SEO are all edited from the admin panel — no code changes required
 ## Quick start
 
 ```bash
-npm install
+npm install                   # also generates the Prisma client
 cp .env.example .env          # then fill in SESSION_SECRET and NEXT_PUBLIC_SITE_URL
 npx prisma migrate deploy     # create the database
 npm run db:seed               # settings, homepage structure, sample content
 npm run admin:create          # create your first admin user
 npm run dev                   # http://localhost:3000
 ```
+
+> The Prisma client is generated code and is not committed. `npm install` runs
+> `prisma generate` for you, so a fresh clone is ready to seed straight away.
 
 Sign in at `/admin/login`.
 
@@ -37,6 +40,7 @@ node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
 
 | Command | What it does |
 |---|---|
+| `npm install` | Install dependencies and generate the Prisma client |
 | `npm run dev` | Development server |
 | `npm run build` | Generate the client, apply migrations, build for production |
 | `npm start` | Run the production build |
