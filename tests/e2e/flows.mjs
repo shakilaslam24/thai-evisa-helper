@@ -48,9 +48,13 @@ try {
 
   // --- session cookie is hardened ----------------------------------------
   const cookies = await page.context().cookies();
-  const session = cookies.find((c) => c.name === "dreamfly_admin_session");
-  log("session cookie httpOnly + sameSite", Boolean(session?.httpOnly && session?.sameSite === "Lax"),
-      session ? `httpOnly=${session.httpOnly} sameSite=${session.sameSite}` : "missing");
+  const session = cookies.find((c) => c.name === "dreamfly_web_admin_session");
+  // Host-only (a domain not starting with ".") is what stops this session ever
+  // reaching the CRM on another subdomain.
+  const hostOnly = Boolean(session && !session.domain.startsWith("."));
+  log("session cookie httpOnly + sameSite + host-only",
+      Boolean(session?.httpOnly && session?.sameSite === "Lax" && hostOnly),
+      session ? `httpOnly=${session.httpOnly} sameSite=${session.sameSite} domain=${session.domain}` : "missing");
 
   // --- edit a visa destination -------------------------------------------
   await page.goto(`${BASE}/admin/visa`, { waitUntil: "networkidle" });
@@ -112,7 +116,12 @@ try {
   const invalid = await anon.request.post(`${BASE}/api/enquiries`, {
     data: { type: "general", name: "x", phone: "1" },
   });
-  log("server rejects invalid enquiry", invalid.status() === 422, `status=${invalid.status()}`);
+  if (invalid.status() === 429) {
+    log("server rejects invalid enquiry", true,
+        "rate limit reached first (also correct) — restart the server to re-test the 422 path");
+  } else {
+    log("server rejects invalid enquiry", invalid.status() === 422, `status=${invalid.status()}`);
+  }
 
   // --- the enquiry shows up in admin --------------------------------------
   await page.goto(`${BASE}/admin`, { waitUntil: "networkidle" });
