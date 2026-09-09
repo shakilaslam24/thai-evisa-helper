@@ -294,6 +294,8 @@
   .link-arrow {
     display: inline-flex;
     align-items: center;
+    /* Guarantees a 24px touch target (WCAG 2.2 AA) even at smaller type sizes. */
+    min-height: 1.5rem;
     gap: 0.4rem;
     font-weight: 600;
     font-size: 0.9375rem;
