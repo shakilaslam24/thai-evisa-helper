@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { PageHero } from "@/components/site/page-hero";
 import { B2bForm } from "@/components/forms/b2b-form";
 import { WhatsAppLink } from "@/components/site/whatsapp-link";
 import { Reveal } from "@/components/ui/reveal";
-import { Icon } from "@/components/ui/icons";
+import { Icon, IconArrowRight } from "@/components/ui/icons";
 import { getPageSeo } from "@/lib/content";
 import { getSettings, telHref } from "@/lib/settings";
 import { breadcrumbSchema, buildMetadata, jsonLd } from "@/lib/seo";
@@ -20,7 +21,8 @@ const SERVICES = [
   {
     icon: "visa",
     title: "B2B Visa Processing",
-    description: "File preparation, submission support and status follow-up for your clients' applications.",
+    description:
+      "File preparation, submission support and status follow-up for your clients' applications.",
   },
   {
     icon: "plane",
@@ -79,7 +81,7 @@ export default async function B2bPage() {
               <Reveal
                 as="li"
                 key={service.title}
-                delay={(Math.min(index % 3, 3) as 0 | 1 | 2 | 3)}
+                delay={Math.min(index % 3, 3) as 0 | 1 | 2 | 3}
                 className="bg-surface p-7 lg:p-8"
               >
                 <span
@@ -94,6 +96,22 @@ export default async function B2bPage() {
                 </p>
               </Reveal>
             ))}
+
+            {/*
+              Five services in a three-column grid leave one cell empty on the
+              last row. Rather than a dead square, it carries the invitation.
+            */}
+            <li className="flex flex-col justify-center bg-gold-50 p-7 lg:p-8">
+              <h2 className="text-h3 font-semibold">Something else in mind?</h2>
+              <p className="mt-2.5 text-[0.9375rem] leading-relaxed text-ink-muted">
+                Tell us what your agency needs and we'll tell you honestly whether we can support
+                it.
+              </p>
+              <Link href="#partner" className="link-arrow mt-5 text-[0.875rem]">
+                Become a partner
+                <IconArrowRight width={15} height={15} />
+              </Link>
+            </li>
           </ul>
         </div>
       </section>
@@ -120,7 +138,10 @@ export default async function B2bPage() {
                 {settings.primaryPhone ? (
                   <p className="text-[0.875rem] text-ink-subtle">
                     or call{" "}
-                    <a href={telHref(settings.primaryPhone)} className="inline-flex min-h-[26px] items-center font-medium text-ink underline-offset-4 hover:underline">
+                    <a
+                      href={telHref(settings.primaryPhone)}
+                      className="inline-flex min-h-[26px] items-center font-medium text-ink underline-offset-4 hover:underline"
+                    >
                       {settings.primaryPhone}
                     </a>
                   </p>
@@ -135,7 +156,9 @@ export default async function B2bPage() {
         </div>
       </section>
 
-      {schema ? <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: schema }} /> : null}
+      {schema ? (
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: schema }} />
+      ) : null}
     </>
   );
 }
