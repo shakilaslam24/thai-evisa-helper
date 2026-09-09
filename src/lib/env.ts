@@ -22,7 +22,9 @@ const DEV_SESSION_SECRET = "dreamfly-development-secret-do-not-use-in-production
 
 export const env = {
   isProduction,
-  databaseUrl: process.env.DATABASE_URL ?? "file:../data/dreamfly.db",
+  // Must match the default in prisma.config.ts, or migrations and the running
+  // app would point at two different files.
+  databaseUrl: process.env.DATABASE_URL ?? "file:./data/dreamfly.db",
   siteUrl: (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(/\/+$/, ""),
   sessionSecret: isProduction
     ? required("SESSION_SECRET", process.env.SESSION_SECRET)

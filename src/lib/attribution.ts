@@ -18,7 +18,9 @@ export type Attribution = {
   utmTerm: string;
 };
 
-const STORAGE_KEY = "df_attribution";
+// Namespaced to this website. sessionStorage is origin-scoped anyway, so a
+// CRM on another subdomain can neither read nor clash with this.
+const STORAGE_KEY = "dreamfly_web_attribution";
 
 const EMPTY: Attribution = {
   sourcePage: "",

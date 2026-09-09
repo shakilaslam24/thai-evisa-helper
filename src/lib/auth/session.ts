@@ -5,7 +5,19 @@ import { cache } from "react";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 
-export const SESSION_COOKIE = "dreamfly_admin_session";
+/**
+ * Cookie name.
+ *
+ * Deliberately namespaced to the WEBSITE. DreamFly runs a separate CRM, and if
+ * that system ever sets a cookie scoped to `.dreamflyconsultancy.com`, it would
+ * also be sent to this host. A distinct name means the two can never be
+ * confused for one another.
+ *
+ * The cookie is written WITHOUT a `domain` attribute, which makes it host-only:
+ * a cookie set by the website is never sent to the CRM's subdomain, and the
+ * two systems cannot share or hijack each other's sessions.
+ */
+export const SESSION_COOKIE = "dreamfly_web_admin_session";
 const SESSION_TTL_MS = 1000 * 60 * 60 * 8; // 8 hours
 const RENEW_WITHIN_MS = 1000 * 60 * 60; // slide the expiry when < 1h remains
 
@@ -44,6 +56,7 @@ export async function createSession(
     secure: env.isProduction,
     sameSite: "lax",
     path: "/",
+    // No `domain`: host-only, so this session never reaches another subdomain.
     expires: expiresAt,
   });
 }
