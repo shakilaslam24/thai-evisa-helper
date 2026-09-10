@@ -29,7 +29,7 @@ const BUSINESS = {
   addressLine2: "House #104, Road #10/2, Block D",
   city: "Niketan, Gulshan-1, Dhaka",
   country: "Bangladesh",
-  siteUrl: "https://www.dreamflyconsultancy.com",
+  siteUrl: "https://dreamfly.bd",
 } as const;
 
 /**

@@ -9,7 +9,7 @@ import { env } from "@/lib/env";
  * Cookie name.
  *
  * Deliberately namespaced to the WEBSITE. DreamFly runs a separate CRM, and if
- * that system ever sets a cookie scoped to `.dreamflyconsultancy.com`, it would
+ * that system ever sets a cookie scoped to `.dreamfly.bd`, it would
  * also be sent to this host. A distinct name means the two can never be
  * confused for one another.
  *

@@ -51,7 +51,7 @@ Demo records to remove or replace:
 - [ ] Address, Google Maps link, **Google Maps embed URL** (the Contact page map
       appears once this is set)
 - [ ] Social profile links (leave any blank to hide it)
-- [ ] **Site URL** — `https://www.dreamflyconsultancy.com`, no trailing slash
+- [ ] **Site URL** — `https://dreamfly.bd`, no trailing slash
 - [ ] Default SEO title and description
 - [ ] **Allow search engines to index this site** — must be **ON**
 
@@ -67,7 +67,7 @@ Demo records to remove or replace:
 ## 3. Google Search Console
 
 1. Open [Search Console](https://search.google.com/search-console) and add
-   `www.dreamflyconsultancy.com` as a property.
+   `dreamfly.bd` as a property.
 2. Choose the **HTML tag** method. Google shows
    `<meta name="google-site-verification" content="XYZ" />`.
 3. Copy **only the `XYZ` part** into
@@ -126,7 +126,7 @@ counts in memory, so a second run inside the window answers 429 first.
 
 ## 6. After going live
 
-- [ ] `https://www.dreamflyconsultancy.com/robots.txt` shows `Allow: /`
+- [ ] `https://dreamfly.bd/robots.txt` shows `Allow: /`
 - [ ] `/sitemap.xml` lists your real pages
 - [ ] Search Console verification passes
 - [ ] Sitemap submitted

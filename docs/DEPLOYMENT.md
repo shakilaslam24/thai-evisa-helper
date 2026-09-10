@@ -81,12 +81,50 @@ RestartSec=5
 WantedBy=multi-user.target
 ```
 
+### DNS
+
+Point the domain at the server's IP address:
+
+| Type | Name | Value |
+|---|---|---|
+| A | `@` | your server's IPv4 address |
+| A | `www` | your server's IPv4 address |
+
+Pick **one** canonical form and redirect the other. This project is configured
+for the bare domain `https://dreamfly.bd`, with `www` redirecting to it. Serving
+both without a redirect splits your search ranking across two addresses.
+
 ### Reverse proxy (nginx)
 
 ```nginx
+# Redirect http -> https, and www -> bare domain.
 server {
-  listen 443 ssl http2;
-  server_name www.dreamflyconsultancy.com;
+  listen 80;
+  listen [::]:80;
+  server_name dreamfly.bd www.dreamfly.bd;
+  return 301 https://dreamfly.bd$request_uri;
+}
+
+server {
+  listen 443 ssl;
+  listen [::]:443 ssl;
+  http2 on;
+  server_name www.dreamfly.bd;
+
+  ssl_certificate     /etc/letsencrypt/live/dreamfly.bd/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/dreamfly.bd/privkey.pem;
+
+  return 301 https://dreamfly.bd$request_uri;
+}
+
+server {
+  listen 443 ssl;
+  listen [::]:443 ssl;
+  http2 on;
+  server_name dreamfly.bd;
+
+  ssl_certificate     /etc/letsencrypt/live/dreamfly.bd/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/dreamfly.bd/privkey.pem;
 
   # Uploads can be larger than nginx's 1 MB default
   client_max_body_size 12M;
@@ -101,6 +139,18 @@ server {
   }
 }
 ```
+
+### TLS certificate
+
+```bash
+sudo apt install certbot python3-certbot-nginx
+sudo certbot --nginx -d dreamfly.bd -d www.dreamfly.bd
+```
+
+Certbot renews automatically. **HTTPS is not optional here:** the site sends
+`Strict-Transport-Security` with a two-year lifetime, admin session cookies are
+marked `secure` in production, and an `http://` canonical would tell Google the
+insecure address is the real one.
 
 Set `TRUST_PROXY=1` when running behind a proxy, so rate limiting sees the real
 client address rather than `127.0.0.1`.
@@ -243,8 +293,8 @@ verification-tag route already covers the common case.
 Or run the suites against the deployed site:
 
 ```bash
-BASE_URL=https://www.dreamflyconsultancy.com npm run test:security
-BASE_URL=https://www.dreamflyconsultancy.com npm run test:audit
+BASE_URL=https://dreamfly.bd npm run test:security
+BASE_URL=https://dreamfly.bd npm run test:audit
 ```
 
 ---
