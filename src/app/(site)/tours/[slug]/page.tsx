@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { PageHero } from "@/components/site/page-hero";
 import { WhatsAppLink } from "@/components/site/whatsapp-link";
 import { MediaImage } from "@/components/ui/media-image";
 import { QuickEnquiryForm } from "@/components/forms/quick-enquiry-form";
 import { DetailSection, FactTable, NoticeBlock, ProseBlock } from "@/components/site/detail-blocks";
-import { getTourBySlug } from "@/lib/content";
+import { getTourBySlug, getSlugRedirect } from "@/lib/content";
 import { db } from "@/lib/db";
 import { getSettings, telHref } from "@/lib/settings";
 import { breadcrumbSchema, buildMetadata, jsonLd } from "@/lib/seo";
@@ -49,7 +49,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function TourDetailPage({ params }: Props) {
   const { slug } = await params;
   const [tour, settings] = await Promise.all([getTourBySlug(slug), getSettings()]);
-  if (!tour) notFound();
+
+  if (!tour) {
+    // The page may simply have been renamed — send visitors (and search
+    // engines) on to its new address rather than showing a 404.
+    const movedTo = await getSlugRedirect("tour", slug);
+    if (movedTo) permanentRedirect(`/tours/${movedTo}`);
+    notFound();
+  }
 
   const crumbs = [
     { name: "Home", path: "/" },

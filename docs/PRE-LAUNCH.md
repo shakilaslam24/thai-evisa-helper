@@ -115,6 +115,8 @@ counts in memory, so a second run inside the window answers 429 first.
       into your canonical URLs or sitemap)
 - [ ] `TRUST_PROXY=1` if behind nginx, Caddy or Cloudflare
 - [ ] TLS working, HTTP redirects to HTTPS
+- [ ] The `data/` directory (database **and** uploaded images) is on persistent
+      storage — not a disk that is wiped on deploy
 - [ ] Nightly backups scheduled **and copied off the server**
 - [ ] A restore tested at least once
 - [ ] Admin accounts created for each person who needs one — one account each

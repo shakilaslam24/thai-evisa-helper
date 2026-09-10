@@ -71,14 +71,6 @@ const nextConfig: NextConfig = {
           },
         ],
       },
-      {
-        // Uploaded media is immutable: filenames are content-addressed.
-        source: "/uploads/:path*",
-        headers: [
-          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
-          { key: "Content-Disposition", value: "inline" },
-        ],
-      },
     ];
   },
 };

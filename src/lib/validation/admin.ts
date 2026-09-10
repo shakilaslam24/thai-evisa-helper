@@ -214,6 +214,7 @@ export const testimonialSchema = z.object({
     .optional()
     .transform((value) => (value === "" || value === undefined ? null : Number(value))),
   published: bool,
+  featured: bool,
   sortOrder: order,
   isPlaceholder: bool,
   avatarId: optionalId,
@@ -240,6 +241,13 @@ export const pageSeoSchema = z.object({
   noindex: bool,
   ogImageId: optionalId,
 });
+
+export const ENQUIRY_SORTS = [
+  { value: "newest", label: "Newest first" },
+  { value: "oldest", label: "Oldest first" },
+  { value: "name", label: "Name A–Z" },
+  { value: "status", label: "Status" },
+] as const;
 
 export const enquiryUpdateSchema = z.object({
   id: required("Enquiry", 40),

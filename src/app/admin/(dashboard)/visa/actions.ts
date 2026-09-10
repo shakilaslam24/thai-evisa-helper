@@ -105,8 +105,27 @@ export async function saveVisaAction(_prev: ActionState, formData: FormData): Pr
       summary: `Updated ${input.countryName} (${input.status})`,
     });
 
+    // A renamed page keeps its old address working: every link already in the
+    // wild — a search result, a WhatsApp message — still lands correctly.
+    if (previous && previous.slug !== input.slug) {
+      await db.$transaction([
+        // Anything that used to point at the NEW slug is now stale.
+        db.slugRedirect.deleteMany({ where: { kind: "visa", oldSlug: input.slug } }),
+        // Follow an existing chain forward rather than leaving a hop.
+        db.slugRedirect.updateMany({
+          where: { kind: "visa", newSlug: previous.slug },
+          data: { newSlug: input.slug },
+        }),
+        db.slugRedirect.upsert({
+          where: { kind_oldSlug: { kind: "visa", oldSlug: previous.slug } },
+          update: { newSlug: input.slug },
+          create: { kind: "visa", oldSlug: previous.slug, newSlug: input.slug },
+        }),
+      ]);
+      revalidatePublic(`/visa/${previous.slug}`);
+    }
+
     purge(input.slug);
-    if (previous && previous.slug !== input.slug) revalidatePublic(`/visa/${previous.slug}`);
     return ok("Destination saved.");
   }
 
@@ -134,6 +153,9 @@ export async function createVisaAction(formData: FormData): Promise<void> {
   for (let suffix = 2; await db.visaDestination.findUnique({ where: { slug } }); suffix += 1) {
     slug = `${base}-${suffix}`;
   }
+  // If the address had to be adjusted, say so on the next screen rather than
+  // leaving the editor to discover a mysterious "-2" later.
+  const slugWasAdjusted = slug !== base;
 
   const created = await db.visaDestination.create({
     data: { countryName: name, slug, status: "draft" },
@@ -148,7 +170,7 @@ export async function createVisaAction(formData: FormData): Promise<void> {
   });
 
   revalidatePath("/admin/visa");
-  redirect(`/admin/visa/${created.id}`);
+  redirect(`/admin/visa/${created.id}${slugWasAdjusted ? "?slug=adjusted" : ""}`);
 }
 
 export async function setVisaStatusAction(formData: FormData): Promise<void> {

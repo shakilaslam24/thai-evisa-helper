@@ -22,7 +22,7 @@
 | `DATABASE_URL` | yes | `file:./data/dreamfly.db`, or a PostgreSQL URL. A relative SQLite path resolves against the working directory. |
 | `NEXT_PUBLIC_SITE_URL` | **yes** | Public origin, no trailing slash. Canonical URLs, sitemap, Open Graph, admin origin check. **Production refuses to start without it** — otherwise a missing value would silently publish `localhost` canonicals and sitemap URLs to Google. |
 | `SESSION_SECRET` | yes in production | Signs admin session cookies. The app refuses to start in production without it. |
-| `UPLOAD_DIR` | no | Default `./public/uploads`. Must be persistent. |
+| `UPLOAD_DIR` | no | Default `./data/uploads`. Must be persistent. Deliberately outside `public/` — see below. |
 | `MAX_UPLOAD_BYTES` | no | Default `8388608` (8 MB). |
 | `TRUST_PROXY` | no | Set to `1` behind a reverse proxy so the real client IP is used for rate limiting. |
 
@@ -120,6 +120,21 @@ Take a backup before any deploy that includes a migration.
 
 ---
 
+## Where uploaded media lives
+
+Uploads are written to `data/uploads/` and served by a route handler at
+`/uploads/<filename>` — **not** from `public/`.
+
+That is deliberate. Next.js indexes `public/` when the server boots, so an image
+uploaded afterwards returns 404 until the next restart: an administrator would
+add a photo, see it in the media library, place it on the homepage, and visitors
+would get a broken image. Serving through a handler also keeps uploaded files
+outside the web root, so nothing there is reachable except through code that
+validates the request.
+
+One practical benefit: the database and the media now live in the same `data/`
+directory, so there is exactly one path to persist and back up.
+
 ## Backups
 
 ```bash
@@ -132,7 +147,7 @@ Each snapshot contains:
 - `dreamfly.db` — taken with SQLite `VACUUM INTO`, so it is consistent even
   while the site is serving traffic. A plain `cp` of a live database can capture
   a torn write; this does not.
-- `uploads/` — every image referenced by the database
+- `uploads/` — every image referenced by the database (from `data/uploads/`)
 
 The 14 most recent snapshots are kept; older ones are removed.
 
@@ -150,7 +165,7 @@ a backup. Any of rsync, rclone or `aws s3 sync` will do.
 ```bash
 sudo systemctl stop dreamfly
 cp /path/to/backup/dreamfly.db  ./data/dreamfly.db
-rsync -a /path/to/backup/uploads/  ./public/uploads/
+rsync -a /path/to/backup/uploads/  ./data/uploads/
 sudo systemctl start dreamfly
 ```
 
@@ -180,7 +195,8 @@ and JSON columns for exactly this reason.
   database.
 - **Uploads** must move to shared object storage (S3, R2). Replace the write in
   `src/lib/media.ts` with an SDK upload and store the returned URL; nothing else
-  changes, because every consumer reads `Media.url`.
+  changes, because every consumer reads `Media.url`. The route handler at
+  `src/app/uploads/[...path]/route.ts` can then be deleted.
 
 ---
 
@@ -239,8 +255,9 @@ BASE_URL=https://www.dreamflyconsultancy.com npm run test:audit
 generated code and is deliberately not committed. Run `npm install` (which
 generates it via `postinstall`), or `npx prisma generate` on its own.
 
-**Images 404 after a deploy.** `public/uploads` is gitignored by design. Restore
-it from a backup, or point `UPLOAD_DIR` at the persistent volume where it lives.
+**Images 404 after a deploy.** The `data/` directory (database and uploads) is
+gitignored by design. Restore it from a backup, or point `DATABASE_URL` and
+`UPLOAD_DIR` at the persistent volume where it lives.
 
 **"Missing required environment variable SESSION_SECRET".** Set it in `.env`.
 Production refuses to start without one rather than falling back to a known

@@ -140,7 +140,7 @@ export const getAnnouncement = cache(() => getActiveCampaign("announcement_bar")
 export const getTestimonials = cache((take = 6) =>
   db.testimonial.findMany({
     where: { published: true, isPlaceholder: false },
-    orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
+    orderBy: [{ featured: "desc" }, { sortOrder: "asc" }, { createdAt: "desc" }],
     take,
     include: { avatar: true },
   }),
@@ -158,6 +158,20 @@ export const getAboutPage = cache(async () => {
     db.milestone.findMany({ where: { published: true }, orderBy: { sortOrder: "asc" } }),
   ]);
   return { page, gallery, team, milestones };
+});
+
+/**
+ * Where an old address should now point, or null.
+ *
+ * Called only when a page was not found, so it costs nothing on the normal
+ * path — and it means renaming a page never produces a dead link.
+ */
+export const getSlugRedirect = cache(async (kind: "visa" | "tour", oldSlug: string) => {
+  const row = await db.slugRedirect.findUnique({
+    where: { kind_oldSlug: { kind, oldSlug } },
+    select: { newSlug: true },
+  });
+  return row?.newSlug ?? null;
 });
 
 export const getPageSeo = cache((pageKey: string) =>

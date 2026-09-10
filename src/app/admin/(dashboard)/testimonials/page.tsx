@@ -38,6 +38,7 @@ export default async function TestimonialsPage() {
             reviewDate: row.reviewDate ? row.reviewDate.toISOString().slice(0, 10) : "",
             rating: row.rating,
             published: row.published,
+            featured: row.featured,
             sortOrder: row.sortOrder,
             isPlaceholder: row.isPlaceholder,
             avatarId: row.avatarId,

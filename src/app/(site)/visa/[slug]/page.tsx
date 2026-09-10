@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { PageHero } from "@/components/site/page-hero";
 import { FaqList } from "@/components/site/faq-list";
 import { WhatsAppLink } from "@/components/site/whatsapp-link";
@@ -13,7 +13,7 @@ import {
   ProseBlock,
   StepsBlock,
 } from "@/components/site/detail-blocks";
-import { getVisaBySlug } from "@/lib/content";
+import { getVisaBySlug, getSlugRedirect } from "@/lib/content";
 import { db } from "@/lib/db";
 import { getSettings } from "@/lib/settings";
 import { breadcrumbSchema, buildMetadata, faqSchema, jsonLd } from "@/lib/seo";
@@ -61,7 +61,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function VisaDetailPage({ params }: Props) {
   const { slug } = await params;
   const [visa, settings] = await Promise.all([getVisaBySlug(slug), getSettings()]);
-  if (!visa) notFound();
+
+  if (!visa) {
+    // The page may simply have been renamed — send visitors (and search
+    // engines) on to its new address rather than showing a 404.
+    const movedTo = await getSlugRedirect("visa", slug);
+    if (movedTo) permanentRedirect(`/visa/${movedTo}`);
+    notFound();
+  }
 
   const crumbs = [
     { name: "Home", path: "/" },

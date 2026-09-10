@@ -35,7 +35,9 @@ export const env = {
   sessionSecret: isProduction
     ? required("SESSION_SECRET", process.env.SESSION_SECRET)
     : process.env.SESSION_SECRET?.trim() || DEV_SESSION_SECRET,
-  uploadDir: process.env.UPLOAD_DIR ?? "./public/uploads",
+  // NOT inside public/: Next indexes that directory at boot, so uploads added
+  // later would 404 until a restart. Served by src/app/uploads/[...path].
+  uploadDir: process.env.UPLOAD_DIR ?? "./data/uploads",
   maxUploadBytes: Number(process.env.MAX_UPLOAD_BYTES ?? 8 * 1024 * 1024),
   trustProxy: process.env.TRUST_PROXY === "1",
 } as const;

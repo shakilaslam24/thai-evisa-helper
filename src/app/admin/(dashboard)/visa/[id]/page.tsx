@@ -8,9 +8,16 @@ import { parseList } from "@/lib/list";
 
 export const metadata = { title: "Edit destination" };
 
-export default async function VisaEditPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function VisaEditPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ slug?: string }>;
+}) {
   const user = await requireAdmin();
   const { id } = await params;
+  const { slug: slugNotice } = await searchParams;
 
   const [visa, media] = await Promise.all([
     db.visaDestination.findUnique({
@@ -51,6 +58,17 @@ export default async function VisaEditPage({ params }: { params: Promise<{ id: s
       />
 
       <PageBody>
+        {slugNotice === "adjusted" ? (
+          <div className="mb-6 max-w-4xl rounded-md border border-line-gold bg-gold-50 px-5 py-4">
+            <p className="text-[0.875rem] leading-relaxed text-ink-muted">
+              <strong className="font-semibold text-ink">The web address was adjusted.</strong> A
+              destination with that name already existed, so a number was added to keep the address
+              unique. Change the <strong className="font-semibold text-ink">URL slug</strong> below
+              if you would prefer something else — you can still edit it freely at this point.
+            </p>
+          </div>
+        ) : null}
+
         <VisaForm
           visa={{
             ...visa,

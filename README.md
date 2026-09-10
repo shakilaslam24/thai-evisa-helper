@@ -96,7 +96,7 @@ choice of where it appears.
 ```
 prisma/          schema, migrations, seed
 public/brand/    official DreamFly logo assets and generated icons
-public/uploads/  admin-uploaded media (gitignored — back this up)
+data/            SQLite database + uploaded media (gitignored — back this up)
 scripts/         admin creation, backup
 src/app/(site)/  public website
 src/app/admin/   admin panel

@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ENQUIRY_STATUSES, ENQUIRY_TYPES } from "@/lib/validation/enquiry";
+import { ENQUIRY_SORTS } from "@/lib/validation/admin";
 
 /**
  * Filter bar for the enquiry inbox. Filters live in the URL so a view can be
@@ -12,10 +13,12 @@ export function EnquiryFilters({
   type,
   status,
   query,
+  sort,
 }: {
   type: string;
   status: string;
   query: string;
+  sort: string;
 }) {
   const router = useRouter();
   const [search, setSearch] = useState(query);
@@ -25,6 +28,7 @@ export function EnquiryFilters({
       ...(type ? { type } : {}),
       ...(status ? { status } : {}),
       ...(query ? { q: query } : {}),
+      ...(sort ? { sort } : {}),
       ...next,
     });
     for (const [key, value] of [...params.entries()]) {
@@ -66,26 +70,46 @@ export function EnquiryFilters({
         ))}
       </div>
 
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          go({ q: search.trim(), page: "" });
-        }}
-        className="flex max-w-md gap-2"
-        role="search"
-      >
-        <input
-          type="search"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search name, phone, email, destination…"
-          className="input"
-          aria-label="Search enquiries"
-        />
-        <button type="submit" className="btn btn-outline shrink-0">
-          Search
-        </button>
-      </form>
+      <div className="flex flex-wrap items-end gap-3">
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            go({ q: search.trim(), page: "" });
+          }}
+          className="flex min-w-0 flex-1 gap-2 sm:max-w-md"
+          role="search"
+        >
+          <input
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search name, phone, email, destination…"
+            className="input"
+            aria-label="Search enquiries"
+          />
+          <button type="submit" className="btn btn-outline shrink-0">
+            Search
+          </button>
+        </form>
+
+        <div className="shrink-0">
+          <label htmlFor="enquiry-sort" className="field-label">
+            Sort by
+          </label>
+          <select
+            id="enquiry-sort"
+            value={sort}
+            onChange={(event) => go({ sort: event.target.value, page: "" })}
+            className="input w-auto"
+          >
+            {ENQUIRY_SORTS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
     </div>
   );
 }

@@ -13,6 +13,9 @@
  * publicly is correct behaviour, not a defect.
  */
 import { chromium } from "playwright";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 
 const BASE = process.env.BASE_URL ?? "http://localhost:3000";
 const EMAIL = process.env.ADMIN_EMAIL ?? "dreamflyhelp@gmail.com";
@@ -207,6 +210,77 @@ try {
   await page.waitForTimeout(2500);
   const cleanHtml = await (await anon.request.get(`${BASE}/?cb=${Date.now()}`)).text();
   log("tag disappears when the token is cleared", !cleanHtml.includes("test-verification-token-123"));
+
+  // ----------------------------------------------------- media upload
+  // A real upload through the real pipeline: magic-byte validation, sharp
+  // re-encoding to WebP, EXIF stripping, and a public URL that actually serves.
+  const dir = mkdtempSync(path.join(tmpdir(), "df-upload-"));
+  // A valid 4×4 PNG in DreamFly navy, written byte-for-byte.
+  const png = Buffer.from(
+    "89504e470d0a1a0a0000000d4948445200000004000000040802000000269309290000001449444154" +
+      "789c63149077608001260624809b030016820077bcd3e8480000000049454e44ae426082",
+    "hex",
+  );
+  const pngPath = path.join(dir, "upload-test.png");
+  writeFileSync(pngPath, png);
+
+  await goAdmin("/admin/media");
+  await page.setInputFiles("#media-files", pngPath);
+  await page.fill("#media-alt", "Automated upload test image");
+  await page.click('button:has-text("Upload")');
+  await page.waitForTimeout(3000);
+  const uploadMsg = await banner();
+  log("image uploads through the admin", uploadMsg.includes("Uploaded"), uploadMsg);
+
+  await goAdmin("/admin/media");
+  const uploadedSrc = await page
+    .locator('img[src^="/uploads/"]')
+    .first()
+    .getAttribute("src")
+    .catch(() => null);
+  log("uploaded image is listed in the library", Boolean(uploadedSrc), uploadedSrc ?? "not found");
+
+  if (uploadedSrc) {
+    const served = await anon.request.get(`${BASE}${uploadedSrc}`);
+    log(
+      "uploaded image is served publicly, re-encoded to WebP",
+      served.status() === 200 && uploadedSrc.endsWith(".webp"),
+      `status=${served.status()} type=${served.headers()["content-type"]}`,
+    );
+  }
+
+  // A file that is not an image must be refused on its bytes, not its name.
+  const fakePath = path.join(dir, "not-really-an-image.png");
+  writeFileSync(fakePath, "#!/bin/sh\necho this is not an image\n");
+  await goAdmin("/admin/media");
+  await page.setInputFiles("#media-files", fakePath);
+  await page.click('button:has-text("Upload")');
+  await page.waitForTimeout(2500);
+  const rejectMsg = await banner();
+  log("a non-image with an image name is refused", /isn.t a supported image/i.test(rejectMsg), rejectMsg);
+
+  // ------------------------------------------------- renamed page redirects
+  await goAdmin("/admin/visa");
+  await page.click('a:has-text("Thailand")');
+  await page.waitForURL(/\/admin\/visa\/[^/]+$/, { timeout: 20000 });
+  await page.fill('input[name="slug"]', "thailand-renamed");
+  await page.click('button:has-text("Save destination")');
+  await page.waitForTimeout(2500);
+
+  const redirected = await anonPage.goto(`${BASE}/visa/thailand`, { waitUntil: "domcontentloaded" });
+  log(
+    "the old address redirects to the new one",
+    redirected?.status() === 200 && anonPage.url().endsWith("/visa/thailand-renamed"),
+    anonPage.url(),
+  );
+
+  // Put it back.
+  await goAdmin("/admin/visa");
+  await page.click('a:has-text("Thailand")');
+  await page.waitForURL(/\/admin\/visa\/[^/]+$/, { timeout: 20000 });
+  await page.fill('input[name="slug"]', "thailand");
+  await page.click('button:has-text("Save destination")');
+  await page.waitForTimeout(2500);
 
   // ----------------------------------------------------------- enquiries
   await anonPage.goto(`${BASE}/contact`, { waitUntil: "networkidle" });

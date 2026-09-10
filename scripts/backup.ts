@@ -38,7 +38,7 @@ async function main() {
   const source = resolveDatabasePath(databaseUrl);
   await stat(source); // fail early with a clear error if it isn't there
 
-  const uploadDir = path.resolve(process.cwd(), process.env.UPLOAD_DIR ?? "./public/uploads");
+  const uploadDir = path.resolve(process.cwd(), process.env.UPLOAD_DIR ?? "./data/uploads");
   const outRoot = path.resolve(process.cwd(), arg("out") ?? "./backups");
 
   const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
@@ -73,7 +73,7 @@ async function main() {
   console.log(`Backup written to ${target}`);
   console.log(`Keeping the ${Math.min(entries.length, RETAIN)} most recent snapshots.`);
   console.log("\nRestore: stop the app, copy dreamfly.db over the live database");
-  console.log("and uploads/ over public/uploads, then start the app again.");
+  console.log("and uploads/ over data/uploads, then start the app again.");
 }
 
 main().catch((error: unknown) => {

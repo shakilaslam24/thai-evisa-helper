@@ -26,6 +26,7 @@ export type TestimonialRow = {
   reviewDate: string;
   rating: number | null;
   published: boolean;
+  featured: boolean;
   sortOrder: number;
   isPlaceholder: boolean;
   avatarId: string | null;
@@ -41,6 +42,7 @@ const BLANK: TestimonialRow = {
   reviewDate: "",
   rating: null,
   published: false,
+  featured: false,
   sortOrder: 0,
   isPlaceholder: false,
   avatarId: null,
@@ -94,6 +96,7 @@ export function TestimonialManager({
                 </div>
                 <div className="flex gap-2">
                   <StatusBadge value={testimonial.published ? "published" : "draft"} />
+                  {testimonial.featured ? <StatusBadge value="new" label="Featured" /> : null}
                   {testimonial.isPlaceholder ? <StatusBadge value="sample" label="Sample" /> : null}
                 </div>
               </div>
@@ -226,6 +229,14 @@ function TestimonialForm({
             name="published"
             defaultChecked={testimonial.published}
             hint="Only published testimonials appear on the homepage."
+          />
+        </FullWidth>
+        <FullWidth>
+          <Toggle
+            label="Featured"
+            name="featured"
+            defaultChecked={testimonial.featured}
+            hint="Featured reviews are shown first on the homepage."
           />
         </FullWidth>
         <FullWidth>

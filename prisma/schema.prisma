@@ -549,13 +549,14 @@ model Testimonial {
   rating      Int? // 1–5, optional
   avatarId    String?
   published   Boolean @default(false)
+  featured    Boolean @default(false)
   sortOrder   Int     @default(0)
   isPlaceholder Boolean @default(false)
   createdAt   DateTime @default(now())
 
   avatar Media? @relation(fields: [avatarId], references: [id], onDelete: SetNull)
 
-  @@index([published, sortOrder])
+  @@index([published, featured, sortOrder])
 }
 
 // ---------------------------------------------------------------------------
@@ -631,6 +632,27 @@ model PageSeo {
   updatedAt   DateTime @updatedAt
 
   ogImage Media? @relation(fields: [ogImageId], references: [id], onDelete: SetNull)
+}
+
+// ---------------------------------------------------------------------------
+// Slug history.
+//
+// Renaming a published page would otherwise break every link to it that is
+// already in the wild — a search result, a WhatsApp message, a Facebook post.
+// The old address is recorded here and permanently redirected to the new one,
+// so the link keeps working and the search ranking follows it across.
+// ---------------------------------------------------------------------------
+
+model SlugRedirect {
+  id        String   @id @default(cuid())
+  /// "visa" | "tour"
+  kind      String
+  oldSlug   String
+  newSlug   String
+  createdAt DateTime @default(now())
+
+  @@unique([kind, oldSlug])
+  @@index([kind, oldSlug])
 }
 
 // ---------------------------------------------------------------------------

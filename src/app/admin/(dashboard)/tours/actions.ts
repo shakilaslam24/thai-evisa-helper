@@ -107,8 +107,27 @@ export async function saveTourAction(_prev: ActionState, formData: FormData): Pr
       summary: `Updated ${input.name} (${input.status})`,
     });
 
+    // A renamed page keeps its old address working: every link already in the
+    // wild — a search result, a WhatsApp message — still lands correctly.
+    if (previous && previous.slug !== input.slug) {
+      await db.$transaction([
+        // Anything that used to point at the NEW slug is now stale.
+        db.slugRedirect.deleteMany({ where: { kind: "tour", oldSlug: input.slug } }),
+        // Follow an existing chain forward rather than leaving a hop.
+        db.slugRedirect.updateMany({
+          where: { kind: "tour", newSlug: previous.slug },
+          data: { newSlug: input.slug },
+        }),
+        db.slugRedirect.upsert({
+          where: { kind_oldSlug: { kind: "tour", oldSlug: previous.slug } },
+          update: { newSlug: input.slug },
+          create: { kind: "tour", oldSlug: previous.slug, newSlug: input.slug },
+        }),
+      ]);
+      revalidatePublic(`/tours/${previous.slug}`);
+    }
+
     purge(input.slug);
-    if (previous && previous.slug !== input.slug) revalidatePublic(`/tours/${previous.slug}`);
     return ok("Package saved.");
   }
 
@@ -134,6 +153,9 @@ export async function createTourAction(formData: FormData): Promise<void> {
   for (let suffix = 2; await db.tourPackage.findUnique({ where: { slug } }); suffix += 1) {
     slug = `${base}-${suffix}`;
   }
+  // If the address had to be adjusted, say so on the next screen rather than
+  // leaving the editor to discover a mysterious "-2" later.
+  const slugWasAdjusted = slug !== base;
 
   const created = await db.tourPackage.create({ data: { name, slug, status: "draft" } });
   await audit({
@@ -145,7 +167,7 @@ export async function createTourAction(formData: FormData): Promise<void> {
   });
 
   revalidatePath("/admin/tours");
-  redirect(`/admin/tours/${created.id}`);
+  redirect(`/admin/tours/${created.id}${slugWasAdjusted ? "?slug=adjusted" : ""}`);
 }
 
 export async function setTourStatusAction(formData: FormData): Promise<void> {

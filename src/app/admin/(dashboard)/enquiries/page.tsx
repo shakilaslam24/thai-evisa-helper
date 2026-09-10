@@ -6,13 +6,14 @@ import { EnquiryFilters } from "@/components/admin/enquiry-filters";
 import { ExportButton } from "@/components/admin/export-button";
 import { formatDateTime } from "@/lib/format";
 import { ENQUIRY_STATUSES, ENQUIRY_TYPES } from "@/lib/validation/enquiry";
+import { ENQUIRY_SORTS } from "@/lib/validation/admin";
 import { labelFor } from "@/lib/list";
 
 export const metadata = { title: "Enquiries" };
 
 const PAGE_SIZE = 40;
 
-type Search = Promise<{ type?: string; status?: string; q?: string; page?: string }>;
+type Search = Promise<{ type?: string; status?: string; q?: string; page?: string; sort?: string }>;
 
 export default async function EnquiriesPage({ searchParams }: { searchParams: Search }) {
   const user = await requireAdmin();
@@ -22,6 +23,15 @@ export default async function EnquiriesPage({ searchParams }: { searchParams: Se
   const status = ENQUIRY_STATUSES.some((s) => s.value === params.status) ? params.status! : "";
   const query = (params.q ?? "").trim().slice(0, 80);
   const page = Math.max(1, Number(params.page ?? 1) || 1);
+  const sort = ENQUIRY_SORTS.some((s) => s.value === params.sort) ? params.sort! : "newest";
+
+  const ORDER_BY = {
+    newest: [{ createdAt: "desc" as const }],
+    oldest: [{ createdAt: "asc" as const }],
+    name: [{ name: "asc" as const }],
+    // Newest within each status, so the freshest untouched enquiries lead.
+    status: [{ status: "asc" as const }, { createdAt: "desc" as const }],
+  };
 
   const where = {
     ...(type ? { type } : {}),
@@ -42,7 +52,7 @@ export default async function EnquiriesPage({ searchParams }: { searchParams: Se
   const [enquiries, total] = await Promise.all([
     db.enquiry.findMany({
       where,
-      orderBy: { createdAt: "desc" },
+      orderBy: ORDER_BY[sort as keyof typeof ORDER_BY],
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
     }),
@@ -55,6 +65,7 @@ export default async function EnquiriesPage({ searchParams }: { searchParams: Se
       ...(type ? { type } : {}),
       ...(status ? { status } : {}),
       ...(query ? { q: query } : {}),
+      ...(sort !== "newest" ? { sort } : {}),
       ...next,
     });
     const qs = search.toString();
@@ -70,7 +81,7 @@ export default async function EnquiriesPage({ searchParams }: { searchParams: Se
       />
 
       <PageBody>
-        <EnquiryFilters type={type} status={status} query={query} />
+        <EnquiryFilters type={type} status={status} query={query} sort={sort} />
 
         <div className="mt-6">
           {enquiries.length === 0 ? (
