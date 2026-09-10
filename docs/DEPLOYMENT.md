@@ -8,23 +8,130 @@
 
 > **Important:** with the default SQLite + local-disk setup, this application
 > needs a server with a persistent filesystem — a VPS, a container with a
-> mounted volume, or similar. It will *not* work correctly on a serverless
+> mounted volume, or similar. It will _not_ work correctly on a serverless
 > platform with an ephemeral filesystem, because uploads and the database would
 > be discarded between invocations. To deploy serverless, first move to
 > PostgreSQL and object storage (both covered below).
 
 ---
 
+## Choosing a Hostinger plan
+
+Hostinger sells two very different things. Only one of them runs this site.
+
+| Hostinger product                                                         | Runs this site? | Why                                                                                                                                                                                                                                                                                                                  |
+| ------------------------------------------------------------------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Web Hosting (Premium / Business / Cloud — the cPanel/hPanel shared plans) | **No**          | Shared plans run PHP behind Apache/LiteSpeed. There is no long-running Node.js process to serve a Next.js app, no way to bind port 3000, and no shell service manager. Their "Node.js app" tool, where offered, restarts the process on its own schedule and gives no guarantee that the `data/` directory survives. |
+| **VPS (KVM 1 or larger)**                                                 | **Yes**         | A full Ubuntu server: root shell, a persistent disk, systemd, and your own nginx. This is what the rest of this document assumes.                                                                                                                                                                                    |
+
+**KVM 1** (1 vCPU, 4 GB RAM, 50 GB NVMe) is enough: the site serves static and
+ISR-cached HTML, the database is SQLite, and there are no third-party requests.
+`next build` is the heaviest moment; 4 GB covers it comfortably. Move up only if
+you later add PostgreSQL on the same box.
+
+Choose **Ubuntu 24.04** as the VPS template (plain, not the "with cPanel" or
+"with CyberPanel" images — a control panel would fight nginx for port 80).
+Pick the datacentre nearest your visitors; for Bangladesh that is Singapore or
+Mumbai.
+
+### VPS first-boot
+
+```bash
+# as root on the fresh VPS
+adduser dreamfly && usermod -aG sudo dreamfly
+apt update && apt upgrade -y
+apt install -y nginx git curl
+
+# Node.js 22 LTS
+curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+apt install -y nodejs
+
+# firewall: SSH + web only
+ufw allow OpenSSH && ufw allow 'Nginx Full' && ufw enable
+```
+
+Then continue with **First deploy** below, as the `dreamfly` user, followed by
+**Keeping it running**, **Reverse proxy** and **TLS certificate**.
+
+> Hostinger's VPS firewall (in hPanel) sits _in front of_ `ufw`. If the site is
+> unreachable after certbot, open 80 and 443 there too.
+
+### What Hostinger does _not_ do for you
+
+- **Backups.** The hPanel snapshot is a whole-disk image, not a database backup,
+  and on the cheapest plans it is weekly. Keep `npm run backup` on its cron
+  schedule (see **Backups**) and copy the output off the server.
+- **Node upgrades / security patches.** Enable `unattended-upgrades`.
+- **DNS.** If the domain is registered elsewhere, either point its nameservers
+  at Hostinger or add the A records at the current registrar — see **DNS**.
+
+---
+
+## Full local rehearsal before going live
+
+Run this on your own machine, in a clean clone, and everything the server will
+do is exercised first. Roughly ten minutes.
+
+```bash
+# 1. clean checkout of what will be deployed
+git clone <repository> dreamfly-rehearsal
+cd dreamfly-rehearsal
+npm ci
+
+# 2. environment (a throwaway secret is fine locally)
+cp .env.example .env
+node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+# paste it into SESSION_SECRET, and set NEXT_PUBLIC_SITE_URL="http://localhost:3000"
+
+# 3. database, exactly as the server creates it
+npx prisma migrate deploy
+npm run db:seed
+npm run admin:create
+
+# 4. production build — not `npm run dev`
+npm run build
+npm start          # leave running; open a second terminal for step 5
+```
+
+In the second terminal:
+
+```bash
+npm run typecheck        # types
+npm test                 # 46 unit + CRM-isolation assertions
+npm run test:e2e         # public pages and the enquiry flow
+npm run test:admin       # every admin module: create, edit, publish, delete
+npm run test:security    # auth, rate limiting, upload validation, headers
+npm run test:a11y        # keyboard, labels, contrast, focus order
+npm run test:audit       # 14 pages × 8 widths, 320px → 1920px
+```
+
+All seven must pass before you deploy. `test:e2e` and below need `npm start`
+running; they drive a real Chromium against `http://localhost:3000` (override
+with `BASE_URL=`).
+
+Finally, check by hand what a script cannot judge:
+
+```bash
+npm run demo:list        # confirm 0 demo records are publicly visible
+curl -s localhost:3000/robots.txt
+curl -s localhost:3000/sitemap.xml | head -20
+```
+
+Then stop the server (`Ctrl+C`) and delete the rehearsal clone. Nothing in it
+transfers to production — the server builds its own copy.
+
+---
+
 ## Environment variables
 
-| Variable | Required | Purpose |
-|---|---|---|
-| `DATABASE_URL` | yes | `file:./data/dreamfly.db`, or a PostgreSQL URL. A relative SQLite path resolves against the working directory. |
-| `NEXT_PUBLIC_SITE_URL` | **yes** | Public origin, no trailing slash. Canonical URLs, sitemap, Open Graph, admin origin check. **Production refuses to start without it** — otherwise a missing value would silently publish `localhost` canonicals and sitemap URLs to Google. |
-| `SESSION_SECRET` | yes in production | Signs admin session cookies. The app refuses to start in production without it. |
-| `UPLOAD_DIR` | no | Default `./data/uploads`. Must be persistent. Deliberately outside `public/` — see below. |
-| `MAX_UPLOAD_BYTES` | no | Default `8388608` (8 MB). |
-| `TRUST_PROXY` | no | Set to `1` behind a reverse proxy so the real client IP is used for rate limiting. |
+| Variable               | Required          | Purpose                                                                                                                                                                                                                                     |
+| ---------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`         | yes               | `file:./data/dreamfly.db`, or a PostgreSQL URL. A relative SQLite path resolves against the working directory.                                                                                                                              |
+| `NEXT_PUBLIC_SITE_URL` | **yes**           | Public origin, no trailing slash. Canonical URLs, sitemap, Open Graph, admin origin check. **Production refuses to start without it** — otherwise a missing value would silently publish `localhost` canonicals and sitemap URLs to Google. |
+| `SESSION_SECRET`       | yes in production | Signs admin session cookies. The app refuses to start in production without it.                                                                                                                                                             |
+| `UPLOAD_DIR`           | no                | Default `./data/uploads`. Must be persistent. Deliberately outside `public/` — see below.                                                                                                                                                   |
+| `MAX_UPLOAD_BYTES`     | no                | Default `8388608` (8 MB).                                                                                                                                                                                                                   |
+| `TRUST_PROXY`          | no                | Set to `1` behind a reverse proxy so the real client IP is used for rate limiting.                                                                                                                                                          |
 
 Generate the session secret:
 
@@ -85,10 +192,10 @@ WantedBy=multi-user.target
 
 Point the domain at the server's IP address:
 
-| Type | Name | Value |
-|---|---|---|
-| A | `@` | your server's IPv4 address |
-| A | `www` | your server's IPv4 address |
+| Type | Name  | Value                      |
+| ---- | ----- | -------------------------- |
+| A    | `@`   | your server's IPv4 address |
+| A    | `www` | your server's IPv4 address |
 
 Pick **one** canonical form and redirect the other. This project is configured
 for the bare domain `https://dreamfly.bd`, with `www` redirecting to it. Serving
@@ -282,13 +389,13 @@ verification-tag route already covers the common case.
 
 ## Health checks
 
-| Check | Expected |
-|---|---|
-| `GET /` | 200 |
-| `GET /robots.txt` | 200, `Disallow: /admin` |
-| `GET /sitemap.xml` | 200, lists published visa and tour pages |
-| `GET /admin` signed out | 307 to `/admin/login` |
-| `GET /api/enquiries` | 404 (enquiry data is never publicly readable) |
+| Check                   | Expected                                      |
+| ----------------------- | --------------------------------------------- |
+| `GET /`                 | 200                                           |
+| `GET /robots.txt`       | 200, `Disallow: /admin`                       |
+| `GET /sitemap.xml`      | 200, lists published visa and tour pages      |
+| `GET /admin` signed out | 307 to `/admin/login`                         |
+| `GET /api/enquiries`    | 404 (enquiry data is never publicly readable) |
 
 Or run the suites against the deployed site:
 
