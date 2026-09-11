@@ -48,6 +48,9 @@ apt install -y nodejs
 
 # firewall: SSH + web only
 ufw allow OpenSSH && ufw allow 'Nginx Full' && ufw enable
+
+# Dates in the admin, and campaign schedules, follow the server's timezone.
+timedatectl set-timezone Asia/Dhaka
 ```
 
 Then continue with **First deploy** below, as the `dreamfly` user, followed by
@@ -187,6 +190,8 @@ WorkingDirectory=/srv/dreamfly-website
 EnvironmentFile=/srv/dreamfly-website/.env
 # The unit name and the port both keep this apart from the CRM's service.
 Environment=PORT=3100
+# Scheduled campaigns end at 23:59 in this zone, not in the server's default.
+Environment=TZ=Asia/Dhaka
 ExecStart=/usr/bin/npm start
 Restart=always
 RestartSec=5
@@ -326,6 +331,13 @@ Each snapshot contains:
 
 The 14 most recent snapshots are kept; older ones are removed.
 
+Images are hard-linked to the previous snapshot when they have not changed —
+uploaded files are written once under a random name and never rewritten, so
+this is safe, and it is the difference between keeping one copy of the site's
+media and fourteen. Each snapshot still stands alone: removing an old one
+leaves the rest intact. Copy them off the server with `rsync -aH` or `cp -a`,
+which preserve the links; plain `cp -r` expands them back into full copies.
+
 **Schedule it.** Nightly, via cron:
 
 ```cron
@@ -335,16 +347,116 @@ The 14 most recent snapshots are kept; older ones are removed.
 Copy snapshots off the server — a backup on the same disk as the original is not
 a backup. Any of rsync, rclone or `aws s3 sync` will do.
 
+**Rotate that log.** `/var/log/dreamfly-backup.log` is appended to nightly and
+nothing trims it:
+
+```
+# /etc/logrotate.d/dreamfly
+/var/log/dreamfly-backup.log {
+  monthly
+  rotate 6
+  compress
+  missingok
+  notifempty
+}
+```
+
 ### Restoring
 
 ```bash
 sudo systemctl stop dreamfly
+
+# The database runs in WAL mode, so recent commits may live in the -wal file
+# beside it. Leaving a stale one next to a restored database mixes the two.
+rm -f ./data/dreamfly-website.db-wal ./data/dreamfly-website.db-shm
+
 cp /path/to/backup/dreamfly-website.db  ./data/dreamfly-website.db
 rsync -a /path/to/backup/uploads/  ./data/uploads/
 sudo systemctl start dreamfly
 ```
 
+The snapshot itself needs no such care: `VACUUM INTO` writes a complete
+database, WAL contents included.
+
 Verify by signing in and checking that recent enquiries are present.
+
+---
+
+## Housekeeping
+
+```bash
+npm run maintenance
+```
+
+Three things grow quietly and are only noticed months later, as a full disk or
+a slow admin screen:
+
+| What             | Kept         | Why it grows                                                                                                                  |
+| ---------------- | ------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| Audit log        | 365 days     | A row for every publish, upload and settings change.                                                                          |
+| Failed sign-ins  | 30 days      | A row per attempt. The limiter caps one address at 10 per 15 minutes, but a scanner spread over many addresses is not capped. |
+| Expired sessions | until expiry | Cleared on each sign-in too.                                                                                                  |
+
+It also checkpoints the write-ahead log, which SQLite usually does on its own
+but can defer while a read is in flight.
+
+Run it nightly, after the backup:
+
+```cron
+30 2 * * * cd /srv/dreamfly-website && /usr/bin/npm run backup >> /var/log/dreamfly-backup.log 2>&1
+45 2 * * * cd /srv/dreamfly-website && /usr/bin/npm run maintenance >> /var/log/dreamfly-backup.log 2>&1
+```
+
+It is safe while the site is serving: it deletes only expired rows, and never
+touches content, media or enquiries.
+
+---
+
+## Keeping it healthy for a year
+
+Most of what breaks a small site months after launch is not the code. It is a
+disk that filled, a certificate nobody renewed, or a backup that was never
+restored. Two cron jobs cover the routine part; the rest is a short list.
+
+**Automatic, nightly** — see the cron lines above: a backup, then housekeeping.
+
+**Monthly, five minutes:**
+
+```bash
+cd /srv/dreamfly-website
+npm run doctor                 # disk, database, build, demo content, indexing
+sudo certbot renew --dry-run   # proves renewal still works before it matters
+sudo apt update && sudo apt upgrade -y
+```
+
+**Once a quarter:**
+
+- **Restore a backup and look at it.** Copy a snapshot to a scratch directory,
+  point a local checkout at it, and sign in. A backup nobody has restored is a
+  hope, not a backup. `npm test` exercises the mechanism; this proves your
+  actual data comes back.
+- `npm audit --omit=dev` — read what a new advisory touches before acting on
+  the severity label; see docs/SECURITY.md.
+- `npm outdated` — Next.js and Prisma patch releases are worth taking. Run the
+  full suite afterwards, not just the build.
+
+**What actually runs out:**
+
+|                                | Grows by                      | Bounded by                                                                                  |
+| ------------------------------ | ----------------------------- | ------------------------------------------------------------------------------------------- |
+| `data/dreamfly-website.db`     | enquiries, audit rows         | housekeeping keeps 365 days of audit history                                                |
+| `data/uploads`                 | every image uploaded, forever | deleting an image in the admin deletes the file                                             |
+| `backups/`                     | one snapshot a night          | 14 kept; images hard-linked, so media is stored once                                        |
+| `.next/cache`                  | each build                    | nothing — safe to delete: `rm -rf .next/cache`                                              |
+| `/var/log/dreamfly-backup.log` | a line a night                | the logrotate rule above                                                                    |
+| journald                       | service output                | `sudo journalctl --vacuum-time=30d`, or set `SystemMaxUse=` in `/etc/systemd/journald.conf` |
+
+**Certificates.** Certbot installs its own timer; `systemctl list-timers` shows
+it. The dry run above is what tells you it will still work in three months.
+
+**If the disk does fill**, the site stops being able to write: enquiries fail
+and uploads error. `npm run doctor` says so plainly. Clear `.next/cache` first,
+then old snapshots in `backups/`.
 
 ---
 

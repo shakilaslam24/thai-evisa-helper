@@ -13,6 +13,7 @@
  * nothing.
  */
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { statfs } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { createServer } from "node:net";
 import path from "node:path";
@@ -158,6 +159,23 @@ async function main() {
     else ok("NEXT_PUBLIC_SITE_URL", siteUrl);
   }
 
+  // A campaign set to end on the 31st ends at 23:59 in the server's zone. On a
+  // VPS that is UTC unless someone says otherwise.
+  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  if (process.env.TZ && process.env.TZ !== zone)
+    warn(
+      "TZ is set but not in effect",
+      `.env says ${process.env.TZ}, the process is running in ${zone}`,
+      "Node reads TZ at startup. Restart through `npm start`, which loads .env before the server begins.",
+    );
+  else if (zone === "UTC")
+    warn(
+      "Timezone is UTC",
+      "Scheduled campaigns will turn over at 06:00 Dhaka time.",
+      'Set TZ="Asia/Dhaka" in .env, and `timedatectl set-timezone Asia/Dhaka` on the server.',
+    );
+  else ok("Timezone", zone);
+
   // ------------------------------------------------------------------- port
   if (port === 3000)
     warn(
@@ -291,6 +309,17 @@ async function main() {
         else ok("Search engines are allowed");
 
         ok("Published content", `${visas} visa page(s), ${tours} tour package(s)`);
+
+        // Nothing trims this without the nightly maintenance job, and a
+        // scanner hitting the sign-in page writes a row per attempt.
+        const auditRows = await db.auditLog.count();
+        if (auditRows > 200_000)
+          warn(
+            "The audit log is very large",
+            `${auditRows.toLocaleString()} entries`,
+            "Run `npm run maintenance`, and put it on the nightly cron — see docs/DEPLOYMENT.md.",
+          );
+        else ok("Audit log", `${auditRows.toLocaleString()} entries`);
         await db.$disconnect();
       }
     } catch (error) {
@@ -314,6 +343,56 @@ async function main() {
     );
   else ok("Upload folder", rel(uploadDir));
 
+  // ------------------------------------------------------------- disk space
+  // A VPS that runs out of disk does not warn anyone: SQLite starts refusing
+  // writes, uploads fail, and the site looks broken for reasons that have
+  // nothing to do with the code.
+  try {
+    const fs = await statfs(ROOT);
+    const freeBytes = fs.bavail * fs.bsize;
+    const totalBytes = fs.blocks * fs.bsize;
+    const freeGb = freeBytes / 1024 ** 3;
+    const percentFree = (freeBytes / totalBytes) * 100;
+    const summary = `${freeGb.toFixed(1)} GB free of ${(totalBytes / 1024 ** 3).toFixed(0)} GB`;
+
+    if (freeGb < 1) {
+      fail(
+        "Almost no disk space left",
+        summary,
+        "SQLite cannot write and uploads will fail. Clear old backups, or grow the disk.",
+      );
+    } else if (freeGb < 3 || percentFree < 10) {
+      warn(
+        "Disk space is getting low",
+        summary,
+        "Check ./backups and .next/cache first. `du -sh * | sort -h` finds the rest.",
+      );
+    } else {
+      ok("Disk space", summary);
+    }
+  } catch {
+    // statfs is unavailable on some platforms. Not a fault.
+  }
+
+  const dataSize = directorySize(path.join(ROOT, "data"));
+  const backupSize = directorySize(path.join(ROOT, "backups"));
+  const cacheSize = directorySize(path.join(ROOT, ".next", "cache"));
+  if (dataSize + backupSize + cacheSize > 0) {
+    ok(
+      "Space in use",
+      `${mb(dataSize)} data/, ${mb(backupSize)} backups/, ${mb(cacheSize)} .next/cache`,
+    );
+  }
+  // The build cache is disposable: it makes the next build faster and nothing
+  // else. It is worth saying so before anyone deletes the wrong directory.
+  if (cacheSize > 2 * 1024 ** 3) {
+    warn(
+      "The build cache is large",
+      mb(cacheSize),
+      "Safe to delete: rm -rf .next/cache — the next build just takes longer.",
+    );
+  }
+
   // ------------------------------------------------------------------ build
   const buildId = path.join(ROOT, ".next", "BUILD_ID");
   if (!existsSync(buildId)) {
@@ -335,6 +414,22 @@ async function main() {
   }
 
   report();
+}
+
+const mb = (bytes: number) =>
+  bytes > 1024 ** 3
+    ? `${(bytes / 1024 ** 3).toFixed(1)} GB`
+    : `${Math.round(bytes / 1024 ** 2)} MB`;
+
+/** Bytes on disk, following the tree. Hard links are counted once per path. */
+function directorySize(dir: string, total = 0): number {
+  if (!existsSync(dir)) return total;
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) total = directorySize(full, total);
+    else if (entry.isFile()) total += statSync(full).size;
+  }
+  return total;
 }
 
 function newestSourceTime(dir: string, newest = 0): number {

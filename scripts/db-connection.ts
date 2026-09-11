@@ -14,6 +14,7 @@ import Database from "better-sqlite3";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { resolveDatabaseUrl } from "../src/lib/db-url";
+import { enableWriteAheadLog } from "../src/lib/sqlite";
 
 try {
   process.loadEnvFile(path.join(process.cwd(), ".env"));
@@ -65,5 +66,10 @@ export function assertOurDatabase(): void {
 
 export function connect(): PrismaClient {
   assertOurDatabase();
-  return new PrismaClient({ adapter: new PrismaBetterSqlite3({ url: databaseUrl }) });
+  enableWriteAheadLog(databaseUrl);
+  const client = new PrismaClient({ adapter: new PrismaBetterSqlite3({ url: databaseUrl }) });
+  // Same reasoning as src/lib/db.ts: WAL defaults to synchronous=NORMAL, and a
+  // seed or an import losing its last writes to a power cut is not acceptable.
+  void client.$executeRawUnsafe("PRAGMA synchronous = FULL").catch(() => {});
+  return client;
 }

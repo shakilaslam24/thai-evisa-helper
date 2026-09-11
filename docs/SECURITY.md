@@ -20,11 +20,11 @@
 
 ## Rate limiting
 
-| Surface | Limit |
-|---|---|
-| Enquiry submission | 5 per IP per 10 minutes |
-| Sign-in, per IP | 10 per 15 minutes |
-| Sign-in, per account | 8 per 15 minutes |
+| Surface              | Limit                   |
+| -------------------- | ----------------------- |
+| Enquiry submission   | 5 per IP per 10 minutes |
+| Sign-in, per IP      | 10 per 15 minutes       |
+| Sign-in, per account | 8 per 15 minutes        |
 
 The per-account limit means one account cannot be ground down from many
 addresses. Counters are held in process memory — see
@@ -35,11 +35,11 @@ addresses. Counters are held in process memory — see
 Three roles, checked server-side on **every** admin page and action via
 `requireAdmin(minimumRole)`:
 
-| Role | Can |
-|---|---|
-| `editor` | Manage content |
-| `admin` | Also: global settings, deletions, CSV export, activity log |
-| `owner` | Everything |
+| Role     | Can                                                        |
+| -------- | ---------------------------------------------------------- |
+| `editor` | Manage content                                             |
+| `admin`  | Also: global settings, deletions, CSV export, activity log |
+| `owner`  | Everything                                                 |
 
 Client-side hiding is presentation only; the server check is the control.
 
@@ -107,6 +107,26 @@ settings changes, uploads, enquiry status changes and CSV exports are recorded
 with actor, action, entity, summary, IP and timestamp. Viewable at
 `/admin/audit` (admin role and above). Audit writes never throw — a logging
 failure must not take down the operation it describes.
+
+## Known advisories
+
+`npm audit` reports four high-severity advisories. All four arrive through the
+`prisma` CLI, which is a **devDependency**:
+
+| Package                               | Reaches the running site?                                                                                                                                                                                                   |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mysql2`                              | No. Pulled in by the Prisma CLI so it can talk to MySQL. This site is SQLite; neither `@prisma/client` nor `@prisma/adapter-better-sqlite3` references it, and both advisories need a connection to a hostile MySQL server. |
+| `deepmerge-ts` (via `@prisma/config`) | No. Used by the CLI when it reads `prisma.config.ts`, a file in this repository. The stack-exhaustion case needs an attacker-supplied object graph.                                                                         |
+
+Do **not** run `npm audit fix --force`. It "fixes" these by downgrading to
+Prisma 6, which this project cannot run: Prisma 7 moved the datasource URL into
+`prisma.config.ts` and the SQLite driver adapter changed shape. The real fix is
+a Prisma 7 patch release; check with `npm outdated prisma` and upgrade normally.
+
+Re-run `npm audit --omit=dev` after any dependency change, and read what a new
+advisory actually touches before acting on the severity label.
+
+---
 
 ## Deployment checklist
 
