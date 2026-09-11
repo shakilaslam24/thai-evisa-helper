@@ -43,16 +43,35 @@ function code(file: string): string {
 }
 
 describe("CRM isolation", () => {
+  const fetchedUrls = (file: string) =>
+    [...code(file).matchAll(/fetch\(\s*([`"'])([^`"']*)\1/g)].map((m) => m[2] ?? "");
+
   it("makes no network request to anywhere but its own API", () => {
+    // The application itself. No exceptions: every call must be a relative
+    // path served by this site.
     const offenders: string[] = [];
-    for (const file of FILES) {
-      for (const match of code(file).matchAll(/fetch\(\s*([`"'])([^`"']*)\1/g)) {
-        const url = match[2] ?? "";
-        // Only same-origin, relative calls to this application's own routes.
+    for (const file of [...sourceFiles("src"), ...sourceFiles("prisma")]) {
+      for (const url of fetchedUrls(file)) {
         if (!url.startsWith("/")) offenders.push(`${file}: fetch("${url}")`);
       }
     }
     assert.deepEqual(offenders, [], `Unexpected outbound fetch:\n${offenders.join("\n")}`);
+  });
+
+  it("keeps the command-line scripts on this machine", () => {
+    // Scripts are local tools, not shipped code, and one of them — the setup
+    // doctor — asks this site's own port for robots.txt to tell "already
+    // running" from "another application took the port". Loopback is therefore
+    // allowed here and nothing else is: a script must never reach a remote
+    // service, and must never be given an address it did not derive itself.
+    const offenders: string[] = [];
+    for (const file of sourceFiles("scripts")) {
+      for (const url of fetchedUrls(file)) {
+        const local = url.startsWith("/") || /^https?:\/\/(127\.0\.0\.1|localhost)(:|\/)/.test(url);
+        if (!local) offenders.push(`${file}: fetch("${url}")`);
+      }
+    }
+    assert.deepEqual(offenders, [], `Script reaches off this machine:\n${offenders.join("\n")}`);
   });
 
   it("opens exactly one database, and only via DATABASE_URL", () => {

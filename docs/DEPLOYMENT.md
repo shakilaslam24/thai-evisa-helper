@@ -81,7 +81,8 @@ npm ci
 # 2. environment (a throwaway secret is fine locally)
 cp .env.example .env
 node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
-# paste it into SESSION_SECRET, and set NEXT_PUBLIC_SITE_URL="http://localhost:3000"
+# paste it into SESSION_SECRET. The template already sets PORT=3100 and
+# NEXT_PUBLIC_SITE_URL="http://localhost:3000" — change the URL to match the port.
 
 # 3. database, exactly as the server creates it
 npx prisma migrate deploy
@@ -97,6 +98,7 @@ In the second terminal:
 
 ```bash
 npm run doctor           # the whole setup, checked in one command
+                         # it flags a NEXT_PUBLIC_SITE_URL that names another port
 npm run typecheck        # types
 npm test                 # 48 unit + CRM-isolation assertions
 npm run test:e2e         # public pages and the enquiry flow
@@ -108,15 +110,15 @@ npm run test:browsers    # real phone, tablet and desktop profiles
 ```
 
 All eight must pass before you deploy. `test:e2e` and below need `npm start`
-running; they drive a real Chromium against `http://localhost:3000` (override
-with `BASE_URL=`).
+running. They read the port from `.env`, so they follow `PORT` without being
+told; `BASE_URL=` overrides it to test a deployed site.
 
 Finally, check by hand what a script cannot judge:
 
 ```bash
 npm run demo:list        # confirm 0 demo records are publicly visible
-curl -s localhost:3000/robots.txt
-curl -s localhost:3000/sitemap.xml | head -20
+curl -s localhost:3100/robots.txt
+curl -s localhost:3100/sitemap.xml | head -20
 ```
 
 Then stop the server (`Ctrl+C`) and delete the rehearsal clone. Nothing in it
@@ -163,7 +165,7 @@ npm run db:seed               # settings + homepage structure + sample content
 npm run admin:create          # create the first admin (asks for a password)
 
 npm run build
-npm start                     # listens on :3000
+npm start                     # listens on the port in .env (3100)
 ```
 
 Then sign in at `https://your-domain/admin/login` and work through the

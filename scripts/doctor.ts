@@ -153,12 +153,27 @@ async function main() {
     );
   else ok("Port", String(port));
 
-  if (!(await portIsFree(port)))
-    warn(
-      `Something is already listening on ${port}`,
-      "It may be this site, or another application.",
-      `Stop it first, or choose another port. lsof -i :${port} names the process.`,
-    );
+  if (!(await portIsFree(port))) {
+    // Something is there. Ask it for robots.txt: this site always answers with
+    // its own admin rule, so "the site is already running" can be told apart
+    // from "another application has taken the port".
+    let mine = false;
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}/robots.txt`, {
+        signal: AbortSignal.timeout(2000),
+      });
+      mine = (await response.text()).includes("Disallow: /admin");
+    } catch {
+      mine = false;
+    }
+    if (mine) ok("The site is already running", `http://localhost:${port}`);
+    else
+      warn(
+        `Another application is listening on ${port}`,
+        "It did not answer as this site.",
+        `Stop it, or choose another port. lsof -i :${port} names the process.`,
+      );
+  }
 
   // --------------------------------------------------------------- database
   // Imported here, not at the top: the module rejects a DATABASE_URL that

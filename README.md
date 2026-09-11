@@ -20,7 +20,7 @@ cp .env.example .env          # then fill in SESSION_SECRET and NEXT_PUBLIC_SITE
 npx prisma migrate deploy     # create the database
 npm run db:seed               # settings, homepage structure, sample content
 npm run admin:create          # create your first admin user
-npm run dev                   # http://localhost:3000
+npm run dev                   # the port from .env (3100 by default)
 ```
 
 > The Prisma client is generated code and is not committed. `npm install` runs
