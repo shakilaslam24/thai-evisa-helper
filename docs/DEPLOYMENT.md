@@ -130,7 +130,7 @@ transfers to production — the server builds its own copy.
 
 | Variable               | Required          | Purpose                                                                                                                                                                                                                                     |
 | ---------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`         | yes               | `file:./data/dreamfly.db`, or a PostgreSQL URL. A relative SQLite path resolves against the working directory.                                                                                                                              |
+| `DATABASE_URL`         | yes               | `file:./data/dreamfly-website.db`, or a PostgreSQL URL. A relative SQLite path resolves against the working directory.                                                                                                                      |
 | `NEXT_PUBLIC_SITE_URL` | **yes**           | Public origin, no trailing slash. Canonical URLs, sitemap, Open Graph, admin origin check. **Production refuses to start without it** — otherwise a missing value would silently publish `localhost` canonicals and sitemap URLs to Google. |
 | `SESSION_SECRET`       | yes in production | Signs admin session cookies. The app refuses to start in production without it.                                                                                                                                                             |
 | `UPLOAD_DIR`           | no                | Default `./data/uploads`. Must be persistent. Deliberately outside `public/` — see below.                                                                                                                                                   |
@@ -319,7 +319,7 @@ npm run backup -- --out /mnt/backups
 
 Each snapshot contains:
 
-- `dreamfly.db` — taken with SQLite `VACUUM INTO`, so it is consistent even
+- `dreamfly-website.db` — taken with SQLite `VACUUM INTO`, so it is consistent even
   while the site is serving traffic. A plain `cp` of a live database can capture
   a torn write; this does not.
 - `uploads/` — every image referenced by the database (from `data/uploads/`)
@@ -339,7 +339,7 @@ a backup. Any of rsync, rclone or `aws s3 sync` will do.
 
 ```bash
 sudo systemctl stop dreamfly
-cp /path/to/backup/dreamfly.db  ./data/dreamfly.db
+cp /path/to/backup/dreamfly-website.db  ./data/dreamfly-website.db
 rsync -a /path/to/backup/uploads/  ./data/uploads/
 sudo systemctl start dreamfly
 ```
@@ -505,15 +505,26 @@ development value.
 Prisma found a database with tables in it that it has no migration record for,
 and refuses to touch it — nothing was written. Before anything else, check
 where `DATABASE_URL` actually points: a relative path is resolved against the
-project folder, so `file:../data/dreamfly.db` lands _beside_ the project rather
+project folder, so `file:../data/dreamfly-website.db` lands _beside_ the project rather
 than inside it, on top of whatever lives there. The value should be
-`file:./data/dreamfly.db`. A path containing `..` is now rejected outright with
+`file:./data/dreamfly-website.db`. A path containing `..` is now rejected outright with
 a message saying so, rather than being opened.
 
 Only if the file really is this site's database — and you know why it has no
 migration history — baseline it as the Prisma docs describe. Never delete a
 database file to clear this error until you know what is in it:
 `sqlite3 <path> ".tables"` is a read-only way to look.
+
+**The database holds tables this project never created** — `users`, `leads`,
+`customers` and the like. That is the CRM's database, not this site's. It gets
+there by running the CRM with its working directory inside this project: the
+CRM creates its SQLite file at a relative path, and lands it in this project's
+`data/` folder. `npm run doctor` names the tables it finds, and the scripts
+refuse to write to a database with none of this site's tables in it.
+
+Do not delete the file. Move it aside — `mv data/<file> data/<file>.crm` — and
+run `npx prisma migrate deploy` to create this site's own, then start the CRM
+from its own directory so it stops writing here.
 
 **"The table `main.AdminUser` does not exist".** The schema was never created
 in the database being used. Run `npx prisma migrate deploy`, and if that

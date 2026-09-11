@@ -200,7 +200,7 @@ async function main() {
     fail(
       "DATABASE_URL is not usable",
       error instanceof Error ? (error.message.split("\n")[0] ?? "") : String(error),
-      'Set DATABASE_URL="file:./data/dreamfly.db" in .env. A path with ".." lands the database beside the project, where the CRM lives.',
+      'Set DATABASE_URL="file:./data/dreamfly-website.db" in .env. A path with ".." lands the database beside the project, where the CRM lives.',
     );
     report();
     return;

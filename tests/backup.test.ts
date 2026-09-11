@@ -59,11 +59,16 @@ const snapshots = () =>
 describe("backup and restore", () => {
   before(() => {
     work = mkdtempSync(path.join(tmpdir(), "dreamfly-backup-"));
-    dbPath = path.join(work, "dreamfly.db");
+    dbPath = path.join(work, "dreamfly-website.db");
     uploadDir = path.join(work, "uploads");
     outRoot = path.join(work, "backups");
 
     const db = new Database(dbPath);
+    // Shaped like this site's database, not just any SQLite file: the scripts
+    // refuse to touch one holding another application's tables, and a fixture
+    // that does not look like ours would be testing the wrong thing.
+    db.exec("CREATE TABLE _prisma_migrations (id TEXT)");
+    db.exec("CREATE TABLE AdminUser (id TEXT)");
     db.exec("CREATE TABLE enquiry (name TEXT)");
     db.prepare("INSERT INTO enquiry (name) VALUES (?), (?), (?)").run("Karim", "Rahim", "Sultana");
     db.close();
@@ -79,7 +84,7 @@ describe("backup and restore", () => {
     const [stamp] = snapshots();
     assert.ok(stamp, "no snapshot directory was created");
     assert.ok(
-      existsSync(path.join(outRoot, stamp, "dreamfly.db")),
+      existsSync(path.join(outRoot, stamp, "dreamfly-website.db")),
       "database missing from snapshot",
     );
     assert.ok(
@@ -99,7 +104,7 @@ describe("backup and restore", () => {
     assert.deepEqual(rows(), [], "the database was not actually emptied");
 
     // The documented restore: copy the snapshot over the live files.
-    cpSync(path.join(outRoot, stamp!, "dreamfly.db"), dbPath);
+    cpSync(path.join(outRoot, stamp!, "dreamfly-website.db"), dbPath);
     cpSync(path.join(outRoot, stamp!, "uploads"), uploadDir, { recursive: true });
 
     assert.deepEqual(rows(), ["Karim", "Rahim", "Sultana"], "restore did not bring the rows back");

@@ -26,13 +26,13 @@ export function assertContainedDatabaseUrl(url: string): string {
       `A relative SQLite path is resolved against the project folder, so ".." ` +
       `puts the database next to the project, alongside unrelated ` +
       `applications — this site must never open one of those.\n\n` +
-      `Use file:./data/dreamfly.db in .env, or an absolute path if the ` +
+      `Use file:./data/dreamfly-website.db in .env, or an absolute path if the ` +
       `database genuinely lives elsewhere.`,
   );
 }
 
 /** The one default path. Migrations, the app and the scripts all use this. */
-export const DEFAULT_DATABASE_URL = "file:./data/dreamfly.db";
+export const DEFAULT_DATABASE_URL = "file:./data/dreamfly-website.db";
 
 /**
  * Reads DATABASE_URL, falling back to the default.

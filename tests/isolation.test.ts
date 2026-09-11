@@ -105,16 +105,16 @@ describe("CRM isolation", () => {
     // The CRM lives in the folder beside this project, so a relative path with
     // ".." in it is not a cosmetic mistake: it is how this site would end up
     // running migrations against the CRM's database.
-    for (const url of ["file:../data/dreamfly.db", "file:./../db.sqlite", "file:../../x.db"]) {
+    for (const url of ["file:../data/dreamfly-website.db", "file:./../db.sqlite", "file:../../x.db"]) {
       assert.throws(() => assertContainedDatabaseUrl(url), /points outside the project/, url);
     }
   });
 
   it("accepts the paths a real deployment uses", () => {
     for (const url of [
-      "file:./data/dreamfly.db",
-      "file:data/dreamfly.db",
-      "file:/var/lib/dreamfly/dreamfly.db",
+      "file:./data/dreamfly-website.db",
+      "file:data/dreamfly-website.db",
+      "file:/var/lib/dreamfly/dreamfly-website.db",
       "postgresql://user:pw@host:5432/dreamfly",
     ]) {
       assert.equal(assertContainedDatabaseUrl(url), url);
