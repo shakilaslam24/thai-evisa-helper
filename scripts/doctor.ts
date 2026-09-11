@@ -13,6 +13,7 @@
  * nothing.
  */
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { createServer } from "node:net";
 import path from "node:path";
 import Database from "better-sqlite3";
@@ -72,6 +73,19 @@ async function main() {
         `package.json says "${pkg.name}"`,
         "You are in another application's folder — possibly the CRM. cd to the website and check out its branch.",
       );
+  }
+
+  // Which commit is checked out. When a report from another machine and this
+  // one disagree, that is the first thing worth comparing.
+  try {
+    const head = execFileSync("git", ["log", "-1", "--format=%h %s"], {
+      cwd: ROOT,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    ok("Checked-out commit", head.slice(0, 72));
+  } catch {
+    // Not a git checkout, or git is unavailable. Not a fault.
   }
 
   const major = Number(process.versions.node.split(".")[0]);
@@ -204,7 +218,11 @@ async function main() {
     );
   } else {
     const inside = !path.relative(ROOT, dbFile).startsWith("..");
-    if (inside) ok("Database", rel(dbFile));
+    // Both the configured string and where it actually lands: a relative path
+    // resolves against the project folder, and the difference between "./data"
+    // and "../data" is the difference between this site's database and
+    // whatever happens to sit beside the project.
+    if (inside) ok("Database", `${databaseUrl} -> ${dbFile}`);
     else
       warn(
         "The database is outside the project",
@@ -221,12 +239,16 @@ async function main() {
       raw.close();
 
       if (!names.includes("AdminUser")) {
+        const listed = names.slice(0, 8).join(", ") || "none";
+        const migrated = names.includes("_prisma_migrations");
         fail(
           "The schema is not in this database",
-          `${names.length} tables, no AdminUser`,
+          `${names.length} table(s): ${listed}${names.length > 8 ? ", ..." : ""}`,
           names.length === 0
-            ? "Run: npx prisma migrate deploy"
-            : 'This file belongs to a different application. Check DATABASE_URL before touching it: sqlite3 <file> ".tables"',
+            ? "Empty file. Run: npx prisma migrate deploy"
+            : migrated
+              ? "It has a migration history but no AdminUser — the migrations were only partly applied. Run: npx prisma migrate deploy"
+              : `Tables with no migration history. This is what makes \`prisma migrate deploy\` answer P3005: the file was not created by this project. Confirm what it is before touching it: sqlite3 ${dbFile} ".tables"`,
         );
       } else {
         const db = connect();
