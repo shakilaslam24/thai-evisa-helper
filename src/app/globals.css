@@ -157,7 +157,9 @@
 
   input, textarea, select, button { font: inherit; color: inherit; }
 
-  /* iOS zooms any field under 16px on focus */
+  /* iOS zooms any field under 16px on focus. This covers controls without a
+     class; `.input` sets its own size in @layer components, which wins over
+     this layer whatever the specificity, so it repeats the rule there. */
   @media (max-width: 767px) {
     input, textarea, select { font-size: 16px; }
   }
@@ -288,6 +290,11 @@
 
   .btn-lg { min-height: 3.25rem; padding-inline: 1.75rem; font-size: 1rem; }
   .btn-sm { min-height: 2.375rem; padding: 0.4375rem 0.875rem; font-size: 0.875rem; }
+  /* A fingertip needs more room than a cursor. 44px is Apple's guidance, and
+     the menu toggle — the most-tapped control on the site — is a .btn-sm. */
+  @media (pointer: coarse) {
+    .btn-sm { min-height: 2.75rem; }
+  }
   .btn-block { width: 100%; }
 
   /* Text link with a gold underline that grows on hover */
@@ -362,8 +369,15 @@
     border: 1px solid var(--color-line-strong);
     border-radius: var(--radius-sm);
     color: var(--color-ink);
-    font-size: 0.9375rem;
+    /* 16px on phones, or iOS Safari zooms the page in when a field is focused
+       and the layout jumps. 15px from md up, where that cannot happen. */
+    font-size: 1rem;
     transition: border-color 160ms var(--ease-out-soft), box-shadow 160ms var(--ease-out-soft);
+  }
+  /* `pointer: fine` rather than width alone: an iPad is 768px wide and still
+     a touch device, and Safari zooms there too. Only a mouse gets 15px. */
+  @media (min-width: 768px) and (pointer: fine) {
+    .input { font-size: 0.9375rem; }
   }
   .input::placeholder { color: var(--color-ink-subtle); opacity: 0.75; }
   .input:focus {

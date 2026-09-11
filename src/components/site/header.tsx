@@ -74,7 +74,13 @@ export function SiteHeader({
             scrolled ? "h-[68px]" : "h-[84px]"
           }`}
         >
-          <Link href="/" className="shrink-0" aria-label={`${companyName} — home`}>
+          {/* flex + min-h keeps the tap area at 44px on a phone without
+              changing the logo's own size or the header's height. */}
+          <Link
+            href="/"
+            className="flex min-h-[44px] shrink-0 items-center"
+            aria-label={`${companyName} — home`}
+          >
             <Image
               src={logoLightUrl}
               alt={companyName}

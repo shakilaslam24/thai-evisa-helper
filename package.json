@@ -2,7 +2,7 @@
   "name": "dreamfly-website",
   "version": "1.0.0",
   "private": true,
-  "description": "Official website for DreamFly Consultancy — Fly Beyond Your Dreams.",
+  "description": "Official website for DreamFly Consultancy \u2014 Fly Beyond Your Dreams.",
   "scripts": {
     "postinstall": "prisma generate",
     "dev": "next dev",
@@ -27,7 +27,8 @@
     "demo:hide": "tsx scripts/demo-content.ts hide",
     "test:admin": "node tests/e2e/admin-modules.mjs",
     "test:security": "node tests/e2e/security-audit.mjs",
-    "test:a11y": "node tests/e2e/accessibility-audit.mjs"
+    "test:a11y": "node tests/e2e/accessibility-audit.mjs",
+    "test:browsers": "node tests/e2e/browser-compat.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
