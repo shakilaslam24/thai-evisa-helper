@@ -12,6 +12,7 @@
  * Usage:  npm run backup [-- --out ./backups]
  */
 import { cp, mkdir, readdir, rm, stat } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import Database from "better-sqlite3";
 import { databaseUrl } from "./db-connection";
@@ -41,8 +42,15 @@ async function main() {
   const uploadDir = path.resolve(process.cwd(), process.env.UPLOAD_DIR ?? "./data/uploads");
   const outRoot = path.resolve(process.cwd(), arg("out") ?? "./backups");
 
+  // Second resolution keeps the folder name readable. Two runs inside the same
+  // second — a cron firing while someone takes a manual backup — would then
+  // collide, and VACUUM INTO refuses to overwrite: the second backup failed
+  // with "output file already exists". Take the next free name instead.
   const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-  const target = path.join(outRoot, stamp);
+  let target = path.join(outRoot, stamp);
+  for (let suffix = 2; existsSync(target); suffix += 1) {
+    target = path.join(outRoot, `${stamp}-${suffix}`);
+  }
   await mkdir(target, { recursive: true });
 
   // Consistent snapshot, safe to run against a live database.
