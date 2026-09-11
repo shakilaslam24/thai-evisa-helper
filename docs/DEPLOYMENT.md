@@ -96,16 +96,18 @@ npm start          # leave running; open a second terminal for step 5
 In the second terminal:
 
 ```bash
+npm run doctor           # the whole setup, checked in one command
 npm run typecheck        # types
-npm test                 # 46 unit + CRM-isolation assertions
+npm test                 # 48 unit + CRM-isolation assertions
 npm run test:e2e         # public pages and the enquiry flow
 npm run test:admin       # every admin module: create, edit, publish, delete
 npm run test:security    # auth, rate limiting, upload validation, headers
 npm run test:a11y        # keyboard, labels, contrast, focus order
 npm run test:audit       # 14 pages × 8 widths, 320px → 1920px
+npm run test:browsers    # real phone, tablet and desktop profiles
 ```
 
-All seven must pass before you deploy. `test:e2e` and below need `npm start`
+All eight must pass before you deploy. `test:e2e` and below need `npm start`
 running; they drive a real Chromium against `http://localhost:3000` (override
 with `BASE_URL=`).
 
@@ -181,6 +183,8 @@ Type=simple
 User=dreamfly
 WorkingDirectory=/srv/dreamfly-website
 EnvironmentFile=/srv/dreamfly-website/.env
+# The unit name and the port both keep this apart from the CRM's service.
+Environment=PORT=3100
 ExecStart=/usr/bin/npm start
 Restart=always
 RestartSec=5
@@ -205,6 +209,17 @@ both without a redirect splits your search ranking across two addresses.
 ### Reverse proxy (nginx)
 
 ```nginx
+# Anything that does not name a host this config knows — the bare IP, a
+# subdomain whose own config is missing or broken — is dropped rather than
+# being handed to whichever server block happens to be first. Without this,
+# a request to crm.dreamfly.bd could be answered by the website.
+server {
+  listen 80 default_server;
+  listen [::]:80 default_server;
+  server_name _;
+  return 444;
+}
+
 # Redirect http -> https, and www -> bare domain.
 server {
   listen 80;
@@ -238,7 +253,7 @@ server {
   client_max_body_size 12M;
 
   location / {
-    proxy_pass         http://127.0.0.1:3000;
+    proxy_pass         http://127.0.0.1:3100;
     proxy_http_version 1.1;
     proxy_set_header   Host              $host;
     proxy_set_header   X-Real-IP         $remote_addr;
@@ -358,6 +373,38 @@ and JSON columns for exactly this reason.
 
 ---
 
+## Running alongside the CRM
+
+DreamFly's CRM is a separate application on a subdomain. The two share a
+server, a domain and a browser, and every one of those is a place they could
+collide. Each is separated deliberately:
+
+| Shared thing    | Website                                 | CRM                           | Why it cannot clash                                                                                                                              |
+| --------------- | --------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Port            | 3100                                    | 3000                          | Set in `.env` and in the systemd unit. `next start` ignores `PORT` from `.env`, so `npm start` goes through `scripts/serve.mjs`, which reads it. |
+| Database        | `DATABASE_URL` only, inside the project | its own                       | A `file:` path containing `..` is rejected outright, so this site cannot reach a database beside the project.                                    |
+| Session cookie  | `dreamfly_web_admin_session`, host-only | its own                       | Written with no `domain` attribute, so the browser never sends it to a subdomain.                                                                |
+| HSTS            | `dreamfly.bd` only                      | its own                       | No `includeSubDomains`, so this site cannot force https on the CRM's subdomain.                                                                  |
+| Browser storage | `dreamfly_web_*` keys                   | its own                       | Different origins anyway; the prefix makes it obvious in devtools.                                                                               |
+| nginx           | `server_name dreamfly.bd`               | `server_name crm.dreamfly.bd` | A `default_server` block returns 444, so a request never falls through to the wrong application.                                                 |
+| Uploads         | `data/uploads` in the project           | its own                       | `UPLOAD_DIR` is resolved against the project.                                                                                                    |
+| systemd unit    | `dreamfly-website`                      | its own                       | Separate units restart independently.                                                                                                            |
+
+`tests/isolation.test.ts` asserts the code-level half of this table on every
+run: no outbound call to another service, one database and only through
+`DATABASE_URL`, no domain-scoped cookie, no import from outside the project.
+
+Two rules for the server itself:
+
+- **Give the CRM its own certificate.** `certbot --nginx -d crm.dreamfly.bd`
+  is a separate run from the website's. The website's certificate covers
+  `dreamfly.bd` and `www.dreamfly.bd` and nothing else.
+- **Deploy them separately.** Nothing in this project's build, migration or
+  backup scripts knows the CRM exists, and none of them should ever be run
+  from the CRM's directory.
+
+---
+
 ## HSTS and the CRM subdomain
 
 The site sends `Strict-Transport-Security: max-age=63072000` — two years of
@@ -423,6 +470,18 @@ Or run the suites against the deployed site:
 BASE_URL=https://dreamfly.bd npm run test:security
 BASE_URL=https://dreamfly.bd npm run test:audit
 ```
+
+---
+
+## When something is wrong
+
+```bash
+npm run doctor
+```
+
+It reads the project, the `.env`, the database, the port and the build, and
+prints what is wrong with the command that fixes it. It changes nothing. Run it
+first — most of the entries below are checks it already makes.
 
 ---
 

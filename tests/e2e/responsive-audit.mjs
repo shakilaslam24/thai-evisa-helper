@@ -9,8 +9,8 @@
  * heading level, a console error, or missing title/description/canonical.
  */
 import { chromium } from "playwright";
+import { BASE } from "./base-url.mjs";
 
-const BASE = "http://localhost:3000";
 const PAGES = [
   "/", "/visa", "/visa/china", "/visa/japan", "/visa/thailand", "/visa/malaysia",
   "/tours", "/tours/thailand-escape-bangkok-pattaya", "/tours/japan-discovery-tour",

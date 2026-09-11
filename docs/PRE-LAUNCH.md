@@ -96,6 +96,13 @@ contains, and links to open all of it.
 ## 4. Final technical checks
 
 ```bash
+npm run doctor
+```
+
+Everything must read `ok`. A warning about demo content or indexing being off
+is exactly what this step is for.
+
+```bash
 npm run typecheck      # types
 npm test               # 46 unit + CRM-isolation checks
 npm run build          # production build

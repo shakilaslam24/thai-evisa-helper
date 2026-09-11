@@ -17,8 +17,8 @@
 import { chromium, devices } from "playwright";
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
+import { BASE } from "./base-url.mjs";
 
-const BASE = process.env.BASE_URL ?? "http://localhost:3000";
 const ROOT = path.resolve(import.meta.dirname, "..", "..");
 
 const results = [];

@@ -9,12 +9,10 @@
  */
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
-import { PrismaClient } from "../src/generated/prisma/client";
 import { hashPassword, validatePasswordStrength } from "../src/lib/auth/password";
+import { connect } from "./db-connection";
 
-const url = process.env.DATABASE_URL ?? "file:./data/dreamfly.db";
-const db = new PrismaClient({ adapter: new PrismaBetterSqlite3({ url }) });
+const db = connect();
 
 function arg(flag: string): string | undefined {
   const index = process.argv.indexOf(`--${flag}`);

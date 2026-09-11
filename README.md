@@ -1,6 +1,6 @@
 # DreamFly Consultancy — Website
 
-The official website for **DreamFly Consultancy** — *Fly Beyond Your Dreams*.
+The official website for **DreamFly Consultancy** — _Fly Beyond Your Dreams_.
 
 A standalone Next.js application with its own lightweight CMS, its own database
 and its own admin panel. Visa destinations, tour packages, campaigns, contact
@@ -38,38 +38,40 @@ node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
 
 ## Scripts
 
-| Command | What it does |
-|---|---|
-| `npm install` | Install dependencies and generate the Prisma client |
-| `npm run dev` | Development server |
-| `npm run build` | Generate the client, apply migrations, build for production |
-| `npm start` | Run the production build |
-| `npm test` | Unit tests — auth, validation, parsing, rate limiting, CRM isolation |
-| `npm run test:e2e` | Public flows against a running server |
-| `npm run test:admin` | Every admin module: create, edit, publish, delete |
-| `npm run test:security` | Access control, headers, injection, rate limiting |
-| `npm run test:a11y` | Accessibility plus admin responsiveness |
-| `npm run test:audit` | Every page at 8 widths, 320px → 1920px |
-| `npm run demo:load` / `demo:list` / `demo:clear` | Demo content for design review |
-| `npm run typecheck` | TypeScript, no emit |
-| `npm run db:migrate` | Create and apply a migration in development |
-| `npm run db:deploy` | Apply pending migrations (production) |
-| `npm run db:seed` | Seed settings, homepage structure and sample content |
-| `npm run db:studio` | Browse the database |
-| `npm run admin:create` | Create or update an admin user |
-| `npm run backup` | Consistent snapshot of the database plus uploads |
+| Command                                          | What it does                                                            |
+| ------------------------------------------------ | ----------------------------------------------------------------------- |
+| `npm install`                                    | Install dependencies and generate the Prisma client                     |
+| `npm run dev`                                    | Development server                                                      |
+| `npm run build`                                  | Generate the client, apply migrations, build for production             |
+| `npm start`                                      | Run the production build                                                |
+| `npm test`                                       | Unit tests — auth, validation, parsing, rate limiting, CRM isolation    |
+| `npm run test:e2e`                               | Public flows against a running server                                   |
+| `npm run test:admin`                             | Every admin module: create, edit, publish, delete                       |
+| `npm run test:security`                          | Access control, headers, injection, rate limiting                       |
+| `npm run test:a11y`                              | Accessibility plus admin responsiveness                                 |
+| `npm run test:audit`                             | Every page at 8 widths, 320px → 1920px                                  |
+| `npm run test:browsers`                          | iPhone, Android, iPad and desktop profiles; CSS and JS support baseline |
+| `npm run doctor`                                 | Checks the setup — env, database, port, build — and names the fix       |
+| `npm run demo:load` / `demo:list` / `demo:clear` | Demo content for design review                                          |
+| `npm run typecheck`                              | TypeScript, no emit                                                     |
+| `npm run db:migrate`                             | Create and apply a migration in development                             |
+| `npm run db:deploy`                              | Apply pending migrations (production)                                   |
+| `npm run db:seed`                                | Seed settings, homepage structure and sample content                    |
+| `npm run db:studio`                              | Browse the database                                                     |
+| `npm run admin:create`                           | Create or update an admin user                                          |
+| `npm run backup`                                 | Consistent snapshot of the database plus uploads                        |
 
 ---
 
 ## Documentation
 
-| Document | Contents |
-|---|---|
+| Document                                     | Contents                                                   |
+| -------------------------------------------- | ---------------------------------------------------------- |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Stack, data model, routes, design system, the CRM boundary |
-| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Server setup, environment, PostgreSQL migration, backups |
-| [docs/ADMIN-GUIDE.md](docs/ADMIN-GUIDE.md) | How the DreamFly team manages the site day to day |
-| [docs/PRE-LAUNCH.md](docs/PRE-LAUNCH.md) | Checklist to work through before going live |
-| [docs/SECURITY.md](docs/SECURITY.md) | Security model and checklist |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)     | Server setup, environment, PostgreSQL migration, backups   |
+| [docs/ADMIN-GUIDE.md](docs/ADMIN-GUIDE.md)   | How the DreamFly team manages the site day to day          |
+| [docs/PRE-LAUNCH.md](docs/PRE-LAUNCH.md)     | Checklist to work through before going live                |
+| [docs/SECURITY.md](docs/SECURITY.md)         | Security model and checklist                               |
 
 ---
 

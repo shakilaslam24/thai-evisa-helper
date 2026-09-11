@@ -14,6 +14,7 @@
 import { cp, mkdir, readdir, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import Database from "better-sqlite3";
+import { databaseUrl } from "./db-connection";
 
 function arg(flag: string): string | undefined {
   const index = process.argv.indexOf(`--${flag}`);
@@ -34,7 +35,6 @@ function resolveDatabasePath(url: string): string {
 const RETAIN = 14;
 
 async function main() {
-  const databaseUrl = process.env.DATABASE_URL ?? "file:./data/dreamfly.db";
   const source = resolveDatabasePath(databaseUrl);
   await stat(source); // fail early with a clear error if it isn't there
 

@@ -7,8 +7,8 @@
  * design time and is verified here for the text colours actually used.
  */
 import { chromium } from "playwright";
+import { BASE } from "./base-url.mjs";
 
-const BASE = process.env.BASE_URL ?? "http://localhost:3000";
 const PUBLIC_PAGES = ["/", "/visa", "/visa/china", "/tours", "/air-ticket-hotel", "/b2b", "/about", "/contact"];
 const ADMIN_PAGES = ["/admin", "/admin/visa", "/admin/settings", "/admin/enquiries", "/admin/seo"];
 

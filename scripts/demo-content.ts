@@ -21,11 +21,9 @@
  * No testimonial is invented as a real client quote: the demo testimonials name
  * themselves as samples.
  */
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
-import { PrismaClient } from "../src/generated/prisma/client";
+import { connect } from "./db-connection";
 
-const url = process.env.DATABASE_URL ?? "file:./data/dreamfly.db";
-const db = new PrismaClient({ adapter: new PrismaBetterSqlite3({ url }) });
+const db = connect();
 
 const DEMO = "[DEMO]";
 const NOTE = "DEMO CONTENT — illustrative only. Replace with DreamFly's real information.";

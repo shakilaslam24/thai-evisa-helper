@@ -13,11 +13,9 @@
  *
  * The script is idempotent: re-running it will not duplicate rows.
  */
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
-import { PrismaClient } from "../src/generated/prisma/client";
+import { connect } from "../scripts/db-connection";
 
-const url = process.env.DATABASE_URL ?? "file:./data/dreamfly.db";
-const db = new PrismaClient({ adapter: new PrismaBetterSqlite3({ url }) });
+const db = connect();
 
 /* -------------------------------------------------------------------------
  * REAL — supplied by DreamFly

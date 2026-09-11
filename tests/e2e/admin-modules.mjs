@@ -16,8 +16,8 @@ import { chromium } from "playwright";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { BASE } from "./base-url.mjs";
 
-const BASE = process.env.BASE_URL ?? "http://localhost:3000";
 const EMAIL = process.env.ADMIN_EMAIL ?? "dreamflyhelp@gmail.com";
 const PASSWORD = process.env.ADMIN_PASSWORD ?? "DreamFly2026!Admin";
 

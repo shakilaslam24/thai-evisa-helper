@@ -12,8 +12,8 @@
  * exercise what they are actually testing.
  */
 import { chromium } from "playwright";
+import { BASE } from "./base-url.mjs";
 
-const BASE = process.env.BASE_URL ?? "http://localhost:3000";
 const results = [];
 const log = (name, pass, detail = "") => {
   results.push({ name, pass });

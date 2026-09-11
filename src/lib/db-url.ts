@@ -30,3 +30,17 @@ export function assertContainedDatabaseUrl(url: string): string {
       `database genuinely lives elsewhere.`,
   );
 }
+
+/** The one default path. Migrations, the app and the scripts all use this. */
+export const DEFAULT_DATABASE_URL = "file:./data/dreamfly.db";
+
+/**
+ * Reads DATABASE_URL, falling back to the default.
+ *
+ * An empty or blank value counts as unset — a `DATABASE_URL=` line left in
+ * .env would otherwise be passed through as "" and open an unnamed database.
+ */
+export function resolveDatabaseUrl(raw: string | undefined): string {
+  const value = (raw ?? "").trim();
+  return assertContainedDatabaseUrl(value === "" ? DEFAULT_DATABASE_URL : value);
+}

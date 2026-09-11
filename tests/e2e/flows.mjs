@@ -1,5 +1,7 @@
 /**
- * End-to-end checks against a running server (default http://localhost:3000).
+ * End-to-end checks against a running server.
+ *
+ * The address comes from BASE_URL, or from PORT in .env — see base-url.mjs.
  *
  *   npm run test:e2e
  *
@@ -12,8 +14,8 @@
  * need the seeded state back.
  */
 import { chromium } from "playwright";
+import { BASE } from "./base-url.mjs";
 
-const BASE = "http://localhost:3000";
 const results = [];
 const log = (name, pass, detail = "") => {
   results.push({ name, pass, detail });
