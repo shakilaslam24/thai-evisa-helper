@@ -153,7 +153,8 @@ cd dreamfly-website
 npm ci                        # also generates the Prisma client
 
 cp .env.example .env
-# edit .env: DATABASE_URL, NEXT_PUBLIC_SITE_URL, SESSION_SECRET
+# edit .env: SESSION_SECRET, and change NEXT_PUBLIC_SITE_URL from the local
+# default to https://dreamfly.bd — the template ships with a localhost value
 
 npx prisma migrate deploy     # create the schema
 npm run db:seed               # settings + homepage structure + sample content
