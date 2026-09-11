@@ -1,6 +1,7 @@
 import path from "node:path";
 import { defineConfig, env } from "prisma/config";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+import { assertContainedDatabaseUrl } from "./src/lib/db-url";
 
 // Prisma 7 no longer auto-loads .env. Node 22+ can do it natively.
 try {
@@ -10,6 +11,9 @@ try {
 }
 
 const DEFAULT_URL = "file:./data/dreamfly.db";
+
+/** The migration commands run through here, so the guard belongs here too. */
+const databaseUrl = () => assertContainedDatabaseUrl(process.env.DATABASE_URL ?? DEFAULT_URL);
 
 /**
  * Prisma 7 configuration.
@@ -25,7 +29,7 @@ export default defineConfig({
     seed: "tsx prisma/seed.ts",
   },
   datasource: {
-    url: process.env.DATABASE_URL ?? DEFAULT_URL,
+    url: databaseUrl(),
   },
-  adapter: async () => new PrismaBetterSqlite3({ url: process.env.DATABASE_URL ?? DEFAULT_URL }),
+  adapter: async () => new PrismaBetterSqlite3({ url: databaseUrl() }),
 });

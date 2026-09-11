@@ -1,4 +1,5 @@
 import "server-only";
+import { assertContainedDatabaseUrl } from "./db-url";
 
 /**
  * Server-side environment. Read once, validated once.
@@ -24,7 +25,7 @@ export const env = {
   isProduction,
   // Must match the default in prisma.config.ts, or migrations and the running
   // app would point at two different files.
-  databaseUrl: process.env.DATABASE_URL ?? "file:./data/dreamfly.db",
+  databaseUrl: assertContainedDatabaseUrl(process.env.DATABASE_URL ?? "file:./data/dreamfly.db"),
   // Required in production: a missing value would publish localhost canonical
   // URLs, a localhost sitemap and localhost Open Graph tags — silently, and to
   // Google. Better to refuse to start.

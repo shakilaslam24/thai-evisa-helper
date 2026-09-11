@@ -13,6 +13,7 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { describe, it } from "node:test";
+import { assertContainedDatabaseUrl } from "../src/lib/db-url.ts";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 
@@ -79,6 +80,26 @@ describe("CRM isolation", () => {
       1,
       `Migrations and the running app must agree on one file. Found: ${[...paths].join(", ")}`,
     );
+  });
+
+  it("refuses a database path that climbs out of the project", () => {
+    // The CRM lives in the folder beside this project, so a relative path with
+    // ".." in it is not a cosmetic mistake: it is how this site would end up
+    // running migrations against the CRM's database.
+    for (const url of ["file:../data/dreamfly.db", "file:./../db.sqlite", "file:../../x.db"]) {
+      assert.throws(() => assertContainedDatabaseUrl(url), /points outside the project/, url);
+    }
+  });
+
+  it("accepts the paths a real deployment uses", () => {
+    for (const url of [
+      "file:./data/dreamfly.db",
+      "file:data/dreamfly.db",
+      "file:/var/lib/dreamfly/dreamfly.db",
+      "postgresql://user:pw@host:5432/dreamfly",
+    ]) {
+      assert.equal(assertContainedDatabaseUrl(url), url);
+    }
   });
 
   it("never scopes the session cookie to a parent domain", () => {

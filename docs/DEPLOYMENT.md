@@ -440,6 +440,25 @@ gitignored by design. Restore it from a backup, or point `DATABASE_URL` and
 Production refuses to start without one rather than falling back to a known
 development value.
 
+**"P3005: The database schema is not empty" from `prisma migrate deploy`.**
+Prisma found a database with tables in it that it has no migration record for,
+and refuses to touch it — nothing was written. Before anything else, check
+where `DATABASE_URL` actually points: a relative path is resolved against the
+project folder, so `file:../data/dreamfly.db` lands _beside_ the project rather
+than inside it, on top of whatever lives there. The value should be
+`file:./data/dreamfly.db`. A path containing `..` is now rejected outright with
+a message saying so, rather than being opened.
+
+Only if the file really is this site's database — and you know why it has no
+migration history — baseline it as the Prisma docs describe. Never delete a
+database file to clear this error until you know what is in it:
+`sqlite3 <path> ".tables"` is a read-only way to look.
+
+**"The table `main.AdminUser` does not exist".** The schema was never created
+in the database being used. Run `npx prisma migrate deploy`, and if that
+reports P3005, read the entry above — the URL is probably pointing somewhere
+unexpected.
+
 **The page loads but has no styling, and images are broken — in Safari.** The
 CSP directive `upgrade-insecure-requests` rewrites every stylesheet, script and
 image request to `https://`. Chrome exempts `localhost`; Safari does not, so on
