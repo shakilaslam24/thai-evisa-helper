@@ -10,7 +10,15 @@
  */
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, before, describe, it } from "node:test";
@@ -70,7 +78,10 @@ describe("backup and restore", () => {
     runBackup();
     const [stamp] = snapshots();
     assert.ok(stamp, "no snapshot directory was created");
-    assert.ok(existsSync(path.join(outRoot, stamp, "dreamfly.db")), "database missing from snapshot");
+    assert.ok(
+      existsSync(path.join(outRoot, stamp, "dreamfly.db")),
+      "database missing from snapshot",
+    );
     assert.ok(
       existsSync(path.join(outRoot, stamp, "uploads", "logo.webp")),
       "uploads missing from snapshot — images would come back broken",
