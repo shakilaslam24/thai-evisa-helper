@@ -1,0 +1,60 @@
+{
+  "name": "dreamfly-website",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Official website for DreamFly Consultancy \u2014 Fly Beyond Your Dreams.",
+  "scripts": {
+    "postinstall": "prisma generate",
+    "dev": "node scripts/serve.mjs dev",
+    "build": "prisma generate && prisma migrate deploy && next build",
+    "start": "node scripts/serve.mjs start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "doctor": "tsx scripts/doctor.ts",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:studio": "prisma studio",
+    "db:seed": "tsx prisma/seed.ts",
+    "admin:create": "tsx scripts/create-admin.ts",
+    "backup": "tsx scripts/backup.ts",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "test:e2e": "node tests/e2e/flows.mjs",
+    "test:audit": "node tests/e2e/responsive-audit.mjs",
+    "demo:load": "tsx scripts/demo-content.ts load",
+    "demo:list": "tsx scripts/demo-content.ts list",
+    "demo:clear": "tsx scripts/demo-content.ts clear",
+    "demo:show": "tsx scripts/demo-content.ts show",
+    "demo:hide": "tsx scripts/demo-content.ts hide",
+    "test:admin": "node tests/e2e/admin-modules.mjs",
+    "test:security": "node tests/e2e/security-audit.mjs",
+    "test:a11y": "node tests/e2e/accessibility-audit.mjs",
+    "test:browsers": "node tests/e2e/browser-compat.mjs"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
+  "dependencies": {
+    "@prisma/adapter-better-sqlite3": "^7.10.0",
+    "@prisma/client": "^7.10.0",
+    "next": "^16.3.4",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^26.5.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.7",
+    "playwright": "^1.63.0",
+    "postcss": "^8.5.28",
+    "prettier": "^3.9.6",
+    "prisma": "^7.10.0",
+    "sharp": "^0.35.4",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2"
+  }
+}

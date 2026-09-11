@@ -1,0 +1,179 @@
+import "server-only";
+import { cache } from "react";
+import { db } from "./db";
+
+/**
+ * Public content queries.
+ *
+ * Two rules hold everywhere:
+ *   1. Only `status: "published"` rows reach the public site.
+ *   2. `isPlaceholder` rows NEVER reach the public site, whatever their status.
+ *      Seeded sample data is flagged this way so demo copy can never be
+ *      mistaken for real business information (brief §26).
+ */
+
+const PUBLIC = { status: "published", isPlaceholder: false } as const;
+
+export const getHomeSections = cache(async () => {
+  const rows = await db.homeSection.findMany({ orderBy: { sortOrder: "asc" } });
+  const byKey = new Map(rows.map((row) => [row.key, row]));
+  return {
+    ordered: rows.filter((row) => row.enabled),
+    /** Section metadata by key; missing rows behave as disabled. */
+    get: (key: string) => byKey.get(key) ?? null,
+    isEnabled: (key: string) => byKey.get(key)?.enabled ?? false,
+  };
+});
+
+export const getHero = cache(() =>
+  db.homeHero.findUnique({
+    where: { id: "hero" },
+    include: { desktopImage: true, mobileImage: true },
+  }),
+);
+
+export const getHomeServices = cache(() =>
+  db.homeService.findMany({
+    where: { enabled: true },
+    orderBy: { sortOrder: "asc" },
+    include: { image: true },
+  }),
+);
+
+export const getWhyItems = cache(() =>
+  db.homeWhyItem.findMany({ where: { enabled: true }, orderBy: { sortOrder: "asc" } }),
+);
+
+export const getFeaturedVisas = cache((take = 9) =>
+  db.visaDestination.findMany({
+    where: { ...PUBLIC, featured: true },
+    orderBy: [{ featuredOrder: "asc" }, { countryName: "asc" }],
+    take,
+    include: { coverImage: true, flagImage: true },
+  }),
+);
+
+export const getPublishedVisas = cache(() =>
+  db.visaDestination.findMany({
+    where: PUBLIC,
+    orderBy: [{ featured: "desc" }, { featuredOrder: "asc" }, { countryName: "asc" }],
+    include: { coverImage: true, flagImage: true },
+  }),
+);
+
+export const getVisaBySlug = cache((slug: string) =>
+  db.visaDestination.findFirst({
+    where: { slug, ...PUBLIC },
+    include: {
+      coverImage: true,
+      flagImage: true,
+      ogImage: true,
+      documents: { orderBy: { sortOrder: "asc" } },
+      faqs: { orderBy: { sortOrder: "asc" } },
+      gallery: { orderBy: { sortOrder: "asc" }, include: { media: true } },
+    },
+  }),
+);
+
+export const getFeaturedTours = cache((take = 6) =>
+  db.tourPackage.findMany({
+    where: { ...PUBLIC, featured: true },
+    orderBy: [{ featuredOrder: "asc" }, { name: "asc" }],
+    take,
+    include: { coverImage: true },
+  }),
+);
+
+export const getPublishedTours = cache(() =>
+  db.tourPackage.findMany({
+    where: PUBLIC,
+    orderBy: [{ featured: "desc" }, { featuredOrder: "asc" }, { name: "asc" }],
+    include: { coverImage: true },
+  }),
+);
+
+export const getTourBySlug = cache((slug: string) =>
+  db.tourPackage.findFirst({
+    where: { slug, ...PUBLIC },
+    include: {
+      coverImage: true,
+      ogImage: true,
+      highlights: { orderBy: { sortOrder: "asc" } },
+      itinerary: { orderBy: { sortOrder: "asc" } },
+      listItems: { orderBy: { sortOrder: "asc" } },
+      gallery: { orderBy: { sortOrder: "asc" }, include: { media: true } },
+    },
+  }),
+);
+
+/**
+ * Campaigns.
+ *
+ * A campaign shows only while it is active AND inside its scheduled window, so
+ * an expired one disappears on its own with no edit, and a section with nothing
+ * to show is never rendered (brief §6, §11).
+ *
+ * `displayLocation` decides where it runs: the homepage band, the site-wide
+ * announcement bar, or the top of the visa / tours / B2B pages.
+ */
+export const getActiveCampaign = cache(async (location: string = "homepage") => {
+  const now = new Date();
+  return db.campaign.findFirst({
+    where: {
+      active: true,
+      isPlaceholder: false,
+      displayLocation: location,
+      AND: [
+        { OR: [{ startsAt: null }, { startsAt: { lte: now } }] },
+        { OR: [{ endsAt: null }, { endsAt: { gte: now } }] },
+      ],
+    },
+    orderBy: [{ featured: "desc" }, { sortOrder: "asc" }, { updatedAt: "desc" }],
+    include: { desktopImage: true, mobileImage: true },
+  });
+});
+
+/** The thin site-wide notice above the header. Null when nothing is running. */
+export const getAnnouncement = cache(() => getActiveCampaign("announcement_bar"));
+
+/** Only real, admin-published testimonials. Never invented (brief §5.07). */
+export const getTestimonials = cache((take = 6) =>
+  db.testimonial.findMany({
+    where: { published: true, isPlaceholder: false },
+    orderBy: [{ featured: "desc" }, { sortOrder: "asc" }, { createdAt: "desc" }],
+    take,
+    include: { avatar: true },
+  }),
+);
+
+export const getAboutPage = cache(async () => {
+  const [page, gallery, team, milestones] = await Promise.all([
+    db.aboutPage.findUnique({ where: { id: "about" } }),
+    db.aboutGalleryImage.findMany({ orderBy: { sortOrder: "asc" }, include: { media: true } }),
+    db.teamMember.findMany({
+      where: { published: true, isPlaceholder: false },
+      orderBy: { sortOrder: "asc" },
+      include: { photo: true },
+    }),
+    db.milestone.findMany({ where: { published: true }, orderBy: { sortOrder: "asc" } }),
+  ]);
+  return { page, gallery, team, milestones };
+});
+
+/**
+ * Where an old address should now point, or null.
+ *
+ * Called only when a page was not found, so it costs nothing on the normal
+ * path — and it means renaming a page never produces a dead link.
+ */
+export const getSlugRedirect = cache(async (kind: "visa" | "tour", oldSlug: string) => {
+  const row = await db.slugRedirect.findUnique({
+    where: { kind_oldSlug: { kind, oldSlug } },
+    select: { newSlug: true },
+  });
+  return row?.newSlug ?? null;
+});
+
+export const getPageSeo = cache((pageKey: string) =>
+  db.pageSeo.findUnique({ where: { pageKey }, include: { ogImage: true } }),
+);
