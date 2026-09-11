@@ -16,28 +16,35 @@ npm run demo:clear    # remove all of it
 ```
 
 Everything it created is flagged as sample content, which the public site
-excludes unconditionally — so even if you forget, nothing fake can reach a
-visitor. Clearing it simply keeps the admin panel tidy.
+excludes unconditionally — so as long as that flag is on, nothing fake can reach
+a visitor. Clearing it simply keeps the admin panel tidy.
 
-If you used `npm run demo:show` to preview the designs, **you must run
-`npm run demo:hide`** (or `demo:clear`). `demo:show` deliberately switches
-search-engine indexing off while demo copy is exposed.
+The one exception is `npm run demo:show`, which lifts that flag on purpose so
+the designs can be reviewed with content in them. If you have used it, **you
+must run `npm run demo:hide`** (or `demo:clear`) before launch. `demo:show`
+switches search-engine indexing off while the demo copy is exposed, and
+`demo:hide` switches it back on.
+
+`npm run demo:list` is the check: it marks every record `protected` or `LIVE`
+and warns at the top if anything is live. Launch with that list showing no
+`LIVE` rows — or no rows at all.
 
 Demo records to remove or replace:
 
-| Where | What |
-|---|---|
+| Where             | What                                                                                         |
+| ----------------- | -------------------------------------------------------------------------------------------- |
 | Visa Destinations | China, Japan, Thailand, Malaysia (illustrative fees and processing times) and 5 empty drafts |
-| Tour Packages | Thailand Escape, Malaysia City & Island, Japan Discovery, Sample Tour Package |
-| Campaigns | Four records whose names begin `[DEMO]` |
-| Testimonials | Three records named `[DEMO] Sample Reviewer …` |
-| About page | Prose beginning `[DEMO]` |
+| Tour Packages     | Thailand Escape, Malaysia City & Island, Japan Discovery, Sample Tour Package                |
+| Campaigns         | Four records whose names begin `[DEMO]`                                                      |
+| Testimonials      | Three records named `[DEMO] Sample Reviewer …`                                               |
+| About page        | Prose beginning `[DEMO]`                                                                     |
 
 ---
 
 ## 2. Enter your real information
 
 ### Global Settings → Contact
+
 - [ ] **Phone numbers.** Add each line, choose its label, and tick where it
       should appear (header, footer, contact page, mobile call bar).
 - [ ] Mark one number **Main phone number**.
@@ -48,6 +55,7 @@ Demo records to remove or replace:
 - [ ] **Office hours** — one row per group of days.
 
 ### Global Settings → the rest
+
 - [ ] Address, Google Maps link, **Google Maps embed URL** (the Contact page map
       appears once this is set)
 - [ ] Social profile links (leave any blank to hide it)
@@ -56,6 +64,7 @@ Demo records to remove or replace:
 - [ ] **Allow search engines to index this site** — must be **ON**
 
 ### Content
+
 - [ ] Visa destinations: real fees, processing times, documents, FAQs
 - [ ] Tour packages: real itineraries and prices
 - [ ] About page: your own words

@@ -48,6 +48,29 @@ async function banner() {
   try { return (await el.textContent({ timeout: 5000 })) ?? ""; } catch { return ""; }
 }
 
+/**
+ * Deletes every record carrying this name, and reports how many there were.
+ *
+ * A run stopped half-way — Ctrl+C, a closed browser — leaves its fixture
+ * behind. The next run then creates a second record with the same name, is
+ * given the slug `...-2`, and every public check here quietly looks at the
+ * wrong address. Clearing first, and looping rather than deleting one, makes
+ * the suite recover from that by itself.
+ */
+async function removeAll(section, name, deleteLabel) {
+  for (let removed = 0; ; removed += 1) {
+    await goAdmin(section);
+    const link = page.locator(`a:has-text("${name}")`).first();
+    if (!(await link.count())) return removed;
+    if (removed >= 5) return removed; // never loop forever on an unexpected page
+    await link.click();
+    await page.waitForURL(new RegExp(`${section}/[^/]+$`), { timeout: 20000 });
+    await page.locator(`button:has-text("${deleteLabel}")`).waitFor({ state: "visible" });
+    await page.click(`button:has-text("${deleteLabel}")`);
+    await page.waitForURL(BASE + section, { timeout: 20000 });
+  }
+}
+
 try {
   // ---------------------------------------------------------------- sign in
   await goAdmin("/admin/login");
@@ -109,6 +132,7 @@ try {
   log("remove the number", !(await page.textContent("body")).includes("01700000099"));
 
   // ------------------------------------------------------ visa CRUD cycle
+  await removeAll("/admin/visa", "Test Destination", "Delete destination");
   await goAdmin("/admin/visa");
   await page.fill('input[name="countryName"]', "Test Destination");
   await page.click('button:has-text("Create draft")');
@@ -152,23 +176,50 @@ try {
   const slugError = await page.locator(".field-error").first().textContent().catch(() => "");
   log("duplicate slug is reported", (slugError ?? "").toLowerCase().includes("different slug"), slugError?.trim());
 
-  // ------------------------------------------------------- tour publishing
+  // ----------------------------------------- tour publishing round-trip
+  // This used to drive one of the demo packages, which made the result depend
+  // on whether `demo:show` happened to be in effect: a demo row is flagged as
+  // a sample, and the Publish control is correctly disabled on those. The test
+  // now creates its own package, so it asserts the same behaviour from any
+  // starting state.
+  await removeAll("/admin/tours", "Test Package", "Delete package");
   await goAdmin("/admin/tours");
-  const tourRow = page.locator("tr", { hasText: "Japan Discovery Tour" }).first();
-  const tourBtn = tourRow.locator('button:has-text("Unpublish")');
-  if (await tourBtn.count()) {
-    await tourBtn.click();
-    await page.waitForTimeout(2000);
-    const gone = await anonPage.goto(`${BASE}/tours/japan-discovery-tour`, { waitUntil: "domcontentloaded" });
-    log("unpublishing a tour removes it publicly", gone?.status() === 404, `status=${gone?.status()}`);
+  await page.fill('input[name="name"]', "Test Package");
+  await page.click('button:has-text("Create draft")');
+  await page.waitForURL(/\/admin\/tours\/[^/]+$/, { timeout: 20000 });
+  log("create a tour package", true, page.url().split("/").pop());
 
-    await page.reload({ waitUntil: "domcontentloaded" });
+  await page.locator('input[name="slug"]').waitFor({ state: "visible" });
+  await page.fill('input[name="duration"]', "5 days / 4 nights");
+  await page.selectOption('select[name="status"]', "published");
+  const tourSample = page.locator('input[name="isPlaceholder"]');
+  if (await tourSample.isChecked()) await tourSample.uncheck();
+  await page.click('button:has-text("Save package")');
+  await page.waitForTimeout(2500);
+  log("tour saves", (await banner()).includes("saved"), await banner());
+
+  const tourLive = await anonPage.goto(`${BASE}/tours/test-package?cb=${Date.now()}`, {
+    waitUntil: "domcontentloaded",
+  });
+  log(
+    "published tour is live, with the values that were typed",
+    tourLive?.status() === 200 && (await anonPage.textContent("body")).includes("5 days / 4 nights"),
+    `status=${tourLive?.status()}`,
+  );
+
+  await goAdmin("/admin/tours");
+  const tourRow = () => page.locator("tr", { hasText: "Test Package" }).first();
+  await tourRow().locator('button:has-text("Unpublish")').click();
+  await page.waitForTimeout(2000);
+  const gone = await anonPage.goto(`${BASE}/tours/test-package`, { waitUntil: "domcontentloaded" });
+  log("unpublishing a tour removes it publicly", gone?.status() === 404, `status=${gone?.status()}`);
+
+  await page.reload({ waitUntil: "domcontentloaded" });
   await page.locator("h1").first().waitFor({ state: "visible" });
-    await page.locator("tr", { hasText: "Japan Discovery Tour" }).first().locator('button:has-text("Publish")').click();
-    await page.waitForTimeout(2000);
-    const back = await anonPage.goto(`${BASE}/tours/japan-discovery-tour`, { waitUntil: "domcontentloaded" });
-    log("republishing restores it", back?.status() === 200, `status=${back?.status()}`);
-  }
+  await tourRow().locator('button:has-text("Publish")').click();
+  await page.waitForTimeout(2000);
+  const back = await anonPage.goto(`${BASE}/tours/test-package`, { waitUntil: "domcontentloaded" });
+  log("republishing restores it", back?.status() === 200, `status=${back?.status()}`);
 
   // ------------------------------------------------------------- campaigns
   await anonPage.goto(BASE, { waitUntil: "networkidle" });
@@ -313,15 +364,21 @@ try {
   log("activity log holds no secrets", !/password|passwordHash|SESSION_SECRET/i.test(auditText));
 
   // --------------------------------------------------------- tidy up again
-  await goAdmin("/admin/visa");
-  await page.click('a:has-text("Test Destination")');
-  await page.waitForURL(/\/admin\/visa\/[^/]+$/, { timeout: 20000 });
-  await page.locator('button:has-text("Delete destination")').waitFor({ state: "visible" });
-  await page.click('button:has-text("Delete destination")');
-  await page.waitForURL(`${BASE}/admin/visa`, { timeout: 20000 });
-  // Read the list fresh, rather than whatever the redirect left in the DOM.
-  await goAdmin("/admin/visa");
-  log("delete removes the destination", !(await page.textContent("body")).includes("Test Destination"));
+  const visasRemoved = await removeAll("/admin/visa", "Test Destination", "Delete destination");
+  // The list was re-read by removeAll before it returned 0, so this reads the
+  // real state rather than whatever the redirect left in the DOM.
+  log(
+    "delete removes the destination",
+    visasRemoved === 1 && !(await page.textContent("body")).includes("Test Destination"),
+    `removed ${visasRemoved}`,
+  );
+
+  const toursRemoved = await removeAll("/admin/tours", "Test Package", "Delete package");
+  log(
+    "delete removes the package",
+    toursRemoved === 1 && !(await page.textContent("body")).includes("Test Package"),
+    `removed ${toursRemoved}`,
+  );
 
   // Restore the China slug the duplicate test left alone (it was rejected).
   await anon.close();

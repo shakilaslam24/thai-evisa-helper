@@ -357,6 +357,25 @@ and JSON columns for exactly this reason.
 
 ---
 
+## HSTS and the CRM subdomain
+
+The site sends `Strict-Transport-Security: max-age=63072000` — two years of
+forced https for `dreamfly.bd` itself. It deliberately does **not** send
+`includeSubDomains`, and does not send `preload`.
+
+That is a decision about the CRM. `includeSubDomains` makes a browser refuse
+plain http for _every_ subdomain of `dreamfly.bd`, the CRM's included, whether
+or not that subdomain has a certificate — this site would then be able to break
+a system it is supposed to stay out of. `preload` is worse: it ships the same
+rule to browsers before they have ever visited the site, and removing it again
+takes months.
+
+Add `includeSubDomains` only once every subdomain, the CRM included, is served
+over https with a valid certificate. It lives in `next.config.ts`, next to the
+comment explaining this.
+
+---
+
 ## Search Console and sitemap
 
 Both `/robots.txt` and `/sitemap.xml` are generated on every request rather than
@@ -419,6 +438,19 @@ gitignored by design. Restore it from a backup, or point `DATABASE_URL` and
 **"Missing required environment variable SESSION_SECRET".** Set it in `.env`.
 Production refuses to start without one rather than falling back to a known
 development value.
+
+**The page loads but has no styling, and images are broken — in Safari.** The
+CSP directive `upgrade-insecure-requests` rewrites every stylesheet, script and
+image request to `https://`. Chrome exempts `localhost`; Safari does not, so on
+a local `http://` server every one of those requests goes to
+`https://localhost:3000`, where nothing is listening. Both that directive and
+HSTS are now sent only when `NEXT_PUBLIC_SITE_URL` begins with `https://`, so a
+local server is unaffected. If it reappears, check that value in `.env`.
+
+**A header change did not take effect after editing `next.config.ts`.** Next.js
+bakes `headers()` into the build. `next start` reads the baked copy, so the
+value of `NEXT_PUBLIC_SITE_URL` **at build time** is what decides whether HSTS
+and `upgrade-insecure-requests` are sent. Change the variable, then rebuild.
 
 **Content edits don't appear.** Admin mutations purge the affected routes. If a
 CDN sits in front of the site, purge its cache too, or lower its TTL for HTML.

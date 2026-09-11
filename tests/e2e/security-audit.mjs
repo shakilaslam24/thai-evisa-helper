@@ -27,8 +27,13 @@ const api = ctx.request;
 try {
   // ------------------------------------------------- admin is not reachable
   for (const path of [
-    "/admin", "/admin/settings", "/admin/enquiries", "/admin/visa",
-    "/admin/media", "/admin/audit", "/admin/seo",
+    "/admin",
+    "/admin/settings",
+    "/admin/enquiries",
+    "/admin/visa",
+    "/admin/media",
+    "/admin/audit",
+    "/admin/seo",
   ]) {
     const r = await api.get(BASE + path, { maxRedirects: 0 });
     const blocked = r.status() === 307 || r.status() === 302 || r.status() === 401;
@@ -43,8 +48,26 @@ try {
   const head = await api.get(BASE);
   const h = head.headers();
   log("CSP present", Boolean(h["content-security-policy"]));
-  log("CSP forbids eval in production", !(h["content-security-policy"] ?? "").includes("unsafe-eval"));
-  log("HSTS present", (h["strict-transport-security"] ?? "").includes("max-age=63072000"));
+  log(
+    "CSP forbids eval in production",
+    !(h["content-security-policy"] ?? "").includes("unsafe-eval"),
+  );
+  // These two are correct on https and wrong on http. Safari honours
+  // `upgrade-insecure-requests` on localhost, so sending it from a local http
+  // server breaks every stylesheet, script and image on the page.
+  const isHttps = BASE.startsWith("https://");
+  const hsts = h["strict-transport-security"] ?? "";
+  const upgrades = (h["content-security-policy"] ?? "").includes("upgrade-insecure-requests");
+  if (isHttps) {
+    log("HSTS present", hsts.includes("max-age=63072000"), hsts);
+    log("CSP upgrades insecure requests", upgrades);
+  } else {
+    log("HSTS withheld over http", hsts === "", hsts || "absent");
+    log("CSP does not upgrade over http", !upgrades);
+  }
+  // HSTS must not reach into subdomains: the CRM lives on one and this site
+  // must not change how a browser reaches it.
+  log("HSTS does not claim subdomains", !hsts.includes("includeSubDomains"));
   log("X-Frame-Options DENY", h["x-frame-options"] === "DENY");
   log("nosniff", h["x-content-type-options"] === "nosniff");
   log("referrer policy set", Boolean(h["referrer-policy"]));
@@ -54,25 +77,36 @@ try {
   const xss = await api.post(`${BASE}/api/enquiries`, {
     data: {
       type: "general",
-      name: '<script>alert(1)</script>',
+      name: "<script>alert(1)</script>",
       phone: "01700000000",
-      message: '<img src=x onerror=alert(1)>',
+      message: "<img src=x onerror=alert(1)>",
     },
   });
   // 429 here means the limiter answered first — also a refusal, never execution.
-  log("script-shaped input is accepted as text, not executed", [200, 422, 429].includes(xss.status()), `status=${xss.status()}`);
+  log(
+    "script-shaped input is accepted as text, not executed",
+    [200, 422, 429].includes(xss.status()),
+    `status=${xss.status()}`,
+  );
 
   const sqli = await api.post(`${BASE}/api/enquiries`, {
     data: { type: "general", name: "Robert'); DROP TABLE Enquiry;--", phone: "01700000000" },
   });
-  log("SQL-shaped input is harmless (parameterised queries)", [200, 422, 429].includes(sqli.status()), `status=${sqli.status()}`);
+  log(
+    "SQL-shaped input is harmless (parameterised queries)",
+    [200, 422, 429].includes(sqli.status()),
+    `status=${sqli.status()}`,
+  );
   const stillUp = await api.get(BASE);
   log("database intact after injection attempt", stillUp.status() === 200);
 
   // The stored value must be escaped when rendered, never executed.
   const page = await ctx.newPage();
   let alerted = false;
-  page.on("dialog", async (d) => { alerted = true; await d.dismiss(); });
+  page.on("dialog", async (d) => {
+    alerted = true;
+    await d.dismiss();
+  });
   await page.goto(`${BASE}/contact`, { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(500);
   log("no script executed from stored input", !alerted);
@@ -81,7 +115,11 @@ try {
   const big = await api.post(`${BASE}/api/enquiries`, {
     data: { type: "general", name: "x".repeat(50000), phone: "01700000000" },
   });
-  log("oversized payload rejected", [413, 422, 429].includes(big.status()), `status=${big.status()}`);
+  log(
+    "oversized payload rejected",
+    [413, 422, 429].includes(big.status()),
+    `status=${big.status()}`,
+  );
 
   // ---------------------------------------------------------- rate limiting
   let limited = false;
@@ -89,7 +127,10 @@ try {
     const r = await api.post(`${BASE}/api/enquiries`, {
       data: { type: "general", name: `Rate Test ${i}`, phone: "01700000000" },
     });
-    if (r.status() === 429) { limited = true; break; }
+    if (r.status() === 429) {
+      limited = true;
+      break;
+    }
   }
   log("enquiry rate limiting engages", limited);
 
@@ -106,8 +147,9 @@ try {
 
   // ------------------------------------------------------- secret exposure
   const html = await head.text();
-  const leaks = ["SESSION_SECRET", "DATABASE_URL", "passwordHash", "scrypt$"]
-    .filter((needle) => html.includes(needle));
+  const leaks = ["SESSION_SECRET", "DATABASE_URL", "passwordHash", "scrypt$"].filter((needle) =>
+    html.includes(needle),
+  );
   log("no secrets in the served HTML", leaks.length === 0, leaks.join(", "));
 
   // --------------------------------------------------------- login lockout
@@ -122,15 +164,31 @@ try {
     await attackPage.fill("#password", `guess-${i}`);
     await attackPage.click('button[type="submit"]');
     await attackPage.waitForTimeout(600);
-    const alertText = (await attackPage.locator('[role="alert"]').first().textContent().catch(() => "")) ?? "";
-    if (/too many attempts/i.test(alertText)) { loginLimited = true; break; }
+    const alertText =
+      (await attackPage
+        .locator('[role="alert"]')
+        .first()
+        .textContent()
+        .catch(() => "")) ?? "";
+    if (/too many attempts/i.test(alertText)) {
+      loginLimited = true;
+      break;
+    }
   }
   log("repeated sign-in attempts are throttled", loginLimited);
 
   // A wrong password must never confirm whether the account exists.
   await attackPage.goto(`${BASE}/admin/login`, { waitUntil: "domcontentloaded" });
-  const realAccountMsg = (await attackPage.locator('[role="alert"]').first().textContent().catch(() => "")) ?? "";
-  log("sign-in failure does not reveal whether an account exists", !/no such user|not found|unknown email/i.test(realAccountMsg));
+  const realAccountMsg =
+    (await attackPage
+      .locator('[role="alert"]')
+      .first()
+      .textContent()
+      .catch(() => "")) ?? "";
+  log(
+    "sign-in failure does not reveal whether an account exists",
+    !/no such user|not found|unknown email/i.test(realAccountMsg),
+  );
 
   await attacker.close();
   await page.close();

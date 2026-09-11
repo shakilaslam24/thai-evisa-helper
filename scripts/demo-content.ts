@@ -452,12 +452,22 @@ async function load() {
     }
   }
 
-  await db.campaign.deleteMany({ where: { isPlaceholder: true } });
+  // Visas and tours above are matched by slug, so a second `load` replaces
+  // them. Campaigns and testimonials have no such key — they are identified by
+  // the [DEMO] prefix every one of them carries. Clearing on the placeholder
+  // flag ALONE was not enough: `demo:show` lifts that flag, so loading again
+  // while the demo is exposed left the old rows behind and created a second
+  // copy of each.
+  const demoNamed = { OR: [{ isPlaceholder: true }, { name: { startsWith: DEMO } }] };
+
+  await db.campaign.deleteMany({ where: demoNamed });
   for (const campaign of CAMPAIGNS) {
     await db.campaign.create({ data: { ...campaign, isPlaceholder: true } });
   }
 
-  await db.testimonial.deleteMany({ where: { isPlaceholder: true } });
+  await db.testimonial.deleteMany({
+    where: { OR: [{ isPlaceholder: true }, { authorName: { startsWith: DEMO } }] },
+  });
   for (const [index, testimonial] of TESTIMONIALS.entries()) {
     await db.testimonial.create({
       data: { ...testimonial, published: true, isPlaceholder: true, sortOrder: index },
@@ -480,37 +490,52 @@ async function load() {
 }
 
 async function list() {
+  // Find demo records by identity, not by the placeholder flag: `demo:show`
+  // lifts that flag, and a pre-launch check that answered "no demo content"
+  // precisely when the demo was live on the public site would be worse than
+  // useless. Each row below reports its own protection state instead.
   const [visas, tours, campaigns, testimonials] = await Promise.all([
     db.visaDestination.findMany({
-      where: { isPlaceholder: true },
-      select: { countryName: true, slug: true, status: true },
+      where: { OR: [{ isPlaceholder: true }, { slug: { in: VISAS.map((x) => x.slug) } }] },
+      select: { countryName: true, slug: true, status: true, isPlaceholder: true },
     }),
     db.tourPackage.findMany({
-      where: { isPlaceholder: true },
-      select: { name: true, slug: true, status: true },
+      where: { OR: [{ isPlaceholder: true }, { slug: { in: TOURS.map((x) => x.slug) } }] },
+      select: { name: true, slug: true, status: true, isPlaceholder: true },
     }),
     db.campaign.findMany({
-      where: { isPlaceholder: true },
-      select: { name: true, displayLocation: true, active: true },
+      where: { OR: [{ isPlaceholder: true }, { name: { startsWith: DEMO } }] },
+      select: { name: true, displayLocation: true, active: true, isPlaceholder: true },
     }),
     db.testimonial.findMany({
-      where: { isPlaceholder: true },
-      select: { authorName: true, published: true },
+      where: { OR: [{ isPlaceholder: true }, { authorName: { startsWith: DEMO } }] },
+      select: { authorName: true, published: true, isPlaceholder: true },
     }),
   ]);
 
+  const exposed = [...visas, ...tours, ...campaigns, ...testimonials].filter(
+    (row) => !row.isPlaceholder,
+  ).length;
+  const mark = (row: { isPlaceholder: boolean }) => (row.isPlaceholder ? "protected" : "LIVE");
+
   console.log("\n=== DEMO CONTENT CURRENTLY IN THE DATABASE ===");
-  console.log("(none of it can appear on the public site while isPlaceholder is true)\n");
+  console.log(
+    exposed === 0
+      ? "(all of it is protected — none can appear on the public site)\n"
+      : `\n  ⚠  ${exposed} demo record(s) are LIVE on the public site right now.\n     Run \`npm run demo:hide\` before launch.\n`,
+  );
   console.log(`Visa destinations (${visas.length}):`);
-  visas.forEach((v) => console.log(`  /visa/${v.slug.padEnd(28)} ${v.countryName} — ${v.status}`));
+  visas.forEach((v) =>
+    console.log(`  /visa/${v.slug.padEnd(28)} ${v.countryName} — ${v.status} — ${mark(v)}`),
+  );
   console.log(`\nTour packages (${tours.length}):`);
-  tours.forEach((t) => console.log(`  /tours/${t.slug.padEnd(34)} ${t.status}`));
+  tours.forEach((t) => console.log(`  /tours/${t.slug.padEnd(34)} ${t.status} — ${mark(t)}`));
   console.log(`\nCampaigns (${campaigns.length}):`);
   campaigns.forEach((c) =>
-    console.log(`  ${c.name} — ${c.displayLocation}${c.active ? "" : " (inactive)"}`),
+    console.log(`  ${c.name} — ${c.displayLocation}${c.active ? "" : " (inactive)"} — ${mark(c)}`),
   );
   console.log(`\nTestimonials (${testimonials.length}):`);
-  testimonials.forEach((t) => console.log(`  ${t.authorName}`));
+  testimonials.forEach((t) => console.log(`  ${t.authorName} — ${mark(t)}`));
   console.log("\nAbout page prose is demo text and starts with [DEMO].");
   console.log("\nRemove it all with:  npm run demo:clear\n");
 }
@@ -588,11 +613,23 @@ async function hide() {
 }
 
 async function clear() {
+  // Matching on the placeholder flag alone would remove nothing at all while
+  // `demo:show` has that flag lifted — and this is the pre-launch step whose
+  // whole job is making sure no demo copy survives. So match the flag OR this
+  // script's own records.
   const [v, t, c, s] = await Promise.all([
-    db.visaDestination.deleteMany({ where: { isPlaceholder: true } }),
-    db.tourPackage.deleteMany({ where: { isPlaceholder: true } }),
-    db.campaign.deleteMany({ where: { isPlaceholder: true } }),
-    db.testimonial.deleteMany({ where: { isPlaceholder: true } }),
+    db.visaDestination.deleteMany({
+      where: { OR: [{ isPlaceholder: true }, { slug: { in: VISAS.map((x) => x.slug) } }] },
+    }),
+    db.tourPackage.deleteMany({
+      where: { OR: [{ isPlaceholder: true }, { slug: { in: TOURS.map((x) => x.slug) } }] },
+    }),
+    db.campaign.deleteMany({
+      where: { OR: [{ isPlaceholder: true }, { name: { startsWith: DEMO } }] },
+    }),
+    db.testimonial.deleteMany({
+      where: { OR: [{ isPlaceholder: true }, { authorName: { startsWith: DEMO } }] },
+    }),
   ]);
   await db.aboutPage.update({
     where: { id: "about" },
